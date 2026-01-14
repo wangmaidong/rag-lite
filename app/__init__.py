@@ -18,13 +18,31 @@ from app.config import Config
 # 导入日志工具，用于获取日志记录器
 from app.utils.logger import get_logger
 
+# 导入数据库初始化函数
+from app.utils.db import init_db
+
 
 # 定义创建 Flask 应用的工厂函数
 def create_app(config_class=Config):
     # 获取名为当前模块的日志记录器（在函数内部获取，避免模块导入时过早初始化
     logger = get_logger(__name__)
+    # 尝试初始化数据库
+    try:
+        # 输出日志
+        logger.info("初始化数据库...")
+        # 执行数据库初始化函数
+        init_db()
+        # 输出日志，表示数据库初始化成功
+        logger.info("数据库初始化成功")
+    except Exception as e:
+        # 输出警告日志，提示数据库初始化失败，并输出异常信息
+        logger.warning(f"数据库初始化失败：{e}")
+        # 输出警告日志，提示检查数据库是否已存在，并建议手动创建数据表
+        logger.warning("请确认数据库已存在，或手动创建数据表")
+        pass
     # 创建Flask 应用对象， 并指定模板和静态文件目录
     base_dir = os.path.abspath(os.path.dirname(__file__))
+    print("app的__name__", __name__)
     app = Flask(
         __name__,
         # 指定模板文件目录

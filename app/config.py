@@ -48,3 +48,17 @@ class Config:
     LOG_ENABLE_CONSOLE = os.environ.get("LOG_ENABLE_CONSOLE", "true").lower() == "true"
     # 是否启用文件日志，默认 True
     LOG_ENABLE_FILE = os.environ.get("LOG_ENABLE_FILE", "true").lower() == "true"
+
+    # 数据库配置
+    # 数据库主机地址，默认为 'localhost'
+    DB_HOST = os.environ.get("DB_HOST", "localhost")
+    # 数据库端口号，默认为 3306
+    DB_PORT = int(os.environ.get("DB_PORT", 3306))
+    # 数据库用户名，默认为 'root'
+    DB_USER = os.environ.get("DB_USER", "root")
+    # 数据库密码，默认为 'root'
+    DB_PASSWORD = os.environ.get("DB_PASSWORD", "root")
+    # 数据库名称，默认为 'rag-lite'
+    DB_NAME = os.environ.get("DB_NAME", "rag-lite")
+    # 数据库字符集，默认为 'utf8mb4'
+    DB_CHARSET = os.environ.get("DB_CHARSET", "utf8mb4")
