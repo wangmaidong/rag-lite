@@ -21,6 +21,9 @@ from app.utils.logger import get_logger
 # 导入数据库初始化函数
 from app.utils.db import init_db
 
+# 导入蓝图模块
+from app.blueprints import auth
+
 
 # 定义创建 Flask 应用的工厂函数
 def create_app(config_class=Config):
@@ -50,17 +53,16 @@ def create_app(config_class=Config):
         # 静态文件目录
         static_folder=os.path.join(base_dir, "static"),
     )
+    # 注册上下文管理器，使current_user指向当前登录的用户，并且在所有的模板里可用
+
     # 从给定配置类加载配置信息到应用
     app.config.from_object(config_class)
     # 启用跨域请求支持
     CORS(app)
     # 记录应用创建日志信息
     logger.info("Flask 应用已创建")
-
-    # 定义首页路由
-    @app.route("/")
-    def index():
-        return "Hello, World!"
+    # 注册蓝图
+    app.register_blueprint(auth.bp)
 
     # 返回已配置的 Flask 应用对象
     return app
