@@ -11,9 +11,11 @@ from flask import Flask
 
 # 导入Flask跨域资源共享支持
 from flask_cors import CORS
+from sqlalchemy.sql.functions import current_user
 
 # 导入应用配置类
 from app.config import Config
+from app.utils.auth import get_current_user
 
 # 导入日志工具，用于获取日志记录器
 from app.utils.logger import get_logger
@@ -53,7 +55,11 @@ def create_app(config_class=Config):
         # 静态文件目录
         static_folder=os.path.join(base_dir, "static"),
     )
+
     # 注册上下文管理器，使current_user指向当前登录的用户，并且在所有的模板里可用
+    @app.context_processor
+    def inject_user():
+        return dict(current_user=get_current_user())
 
     # 从给定配置类加载配置信息到应用
     app.config.from_object(config_class)

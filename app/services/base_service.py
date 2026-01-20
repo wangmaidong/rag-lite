@@ -55,9 +55,9 @@ class BaseService(Generic[T]):
             try:
                 return (
                     db_session.query(model_class)
-                    .filter_by(model_class.id == entity_id)
+                    .filter(model_class.id == entity_id)
                     .first()
                 )
             except Exception as e:
-                self.logger.error(f"获取ID对应的对象失败:{e}")
+                self.logger.error("获取ID对应的对象失败:{e}")
                 return None
