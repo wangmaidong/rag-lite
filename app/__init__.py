@@ -24,7 +24,7 @@ from app.utils.logger import get_logger
 from app.utils.db import init_db
 
 # 导入蓝图模块
-from app.blueprints import auth
+from app.blueprints import auth, knowledgebae
 
 
 # 定义创建 Flask 应用的工厂函数
@@ -69,6 +69,7 @@ def create_app(config_class=Config):
     logger.info("Flask 应用已创建")
     # 注册蓝图
     app.register_blueprint(auth.bp)
-
+    # 注册知识库蓝图
+    app.register_blueprint(knowledgebae.bp)
     # 返回已配置的 Flask 应用对象
     return app
