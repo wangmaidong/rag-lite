@@ -87,4 +87,4 @@ def handle_api_error(func):
             return error_response(str(e), 500)
 
     # 返回包装后的函数
-    return wrapper()
+    return wrapper
