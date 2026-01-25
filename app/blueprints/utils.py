@@ -3,13 +3,16 @@
 """
 
 # 导入Flask用于返回JSON响应
-from flask import jsonify
+from flask import jsonify,request
 
 # 导入装饰器工具，用来保持原函数信息
 from functools import wraps
 
 # 导入获取当前用户的工具函数
 from app.utils.auth import get_current_user
+
+# 导入类型提示
+from typing import Tuple,Optional
 
 # 导入日志模块
 import logging
@@ -88,3 +91,53 @@ def handle_api_error(func):
 
     # 返回包装后的函数
     return wrapper
+
+# 定义获取分页参数的函数，允许指定最大每页数量
+def get_pagination_params(max_page_size:int = 1000) -> Tuple[int,int]:
+    """
+    获取分页参数
+    Args:
+        max_page_size: 最大每页数量
+    Returns:
+        (page, page_size) 元组
+    """
+    # 获取请求中的 'page' 参数，默认为1，并将其转换为整数
+    page = int(request.args.get("page_size", 1))
+    # 获取请求中的 'page_size' 参数，默认为10，并将其转换为整数
+    page_size = int(request.args.get("page_size", 10))
+    # 保证page 至少为1
+    page = max(1, page)
+    # 保证 page_size 至少为1且不超过 max_page_size
+    page_size = max(1, min(page_size, max_page_size))
+
+    # 返回分页的(page, page_size)元组
+    return page, page_size
+
+# 定义获取当前用户或返回错误的函数
+def get_current_user_or_error():
+    """
+    获取当前用户，如果未登录则返回错误响应
+    Returns:
+        如果成功返回 (user_dict, None)，如果失败返回 (None, error_response)
+    """
+    # 调用get_current_user()获取当前用户对象
+    current_user = get_current_user()
+    # 如果没有获取到用户，则返回（None，错误相应）
+    if not current_user:
+        return None, error_response("Unauthorized", 401)
+    # 如果获取到用户，则返回(用户对象,None)
+    return current_user,None
+
+# 定义检查资源所有权的函数，判断当前用户是否为资源所有者
+def check_ownership(
+        entity_user_id: str,
+        current_user_id:str,
+        entity_name:str = "资源"
+) -> Tuple[bool,Optional[Tuple]]:
+    # 检查所有资源所属用户ID是否与当前用户ID相同
+    if entity_user_id != current_user_id:
+        # 如果不同，返回False，并返回403未授权的错误响应
+        return False,error_response(f"Unauthorized to access this {entity_name}", 403)
+    # 如果相同，则有权限，返回True和None
+    return True,None
+
