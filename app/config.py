@@ -78,3 +78,7 @@ class Config:
     MINIO_BUCKET_NAME = os.environ.get("MINIO_BUCKET_NAME", "rag-lite")
     MINIO_SECURE = os.environ.get("MINIO_SECURE", "false").lower() == "true"
     MINIO_REGION = os.environ.get("MINIO_REGION", None)
+
+    DEEPSEEK_CHAT_MODEL = os.environ.get("DEEPSEEK_CHAT_MODEL", "deepseek-chat")
+    DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY") or os.getenv("OPENAI_API_KEY_DEEP")
+    DEEPSEEK_BASE_URL = os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
