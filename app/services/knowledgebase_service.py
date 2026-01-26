@@ -3,8 +3,9 @@ from app.services.base_service import BaseService, T
 
 # 从模型模块导入Knowledgebase类
 from app.models.knowledgebase import Knowledgebase
+
 # 导入类型说明
-from typing import Optional,Dict
+from typing import Optional, Dict
 
 import os
 from app.config import Config
@@ -25,8 +26,8 @@ class KnowledgebaseService(BaseService[Knowledgebase]):
         description: str = None,
         chunk_size: int = 512,
         chunk_overlap: int = 50,
-        cover_image_data:bytes=None,
-        cover_image_filename:str=None
+        cover_image_data: bytes = None,
+        cover_image_filename: str = None,
     ) -> dict:
         """
         创建知识库
@@ -46,17 +47,25 @@ class KnowledgebaseService(BaseService[Knowledgebase]):
         cover_image_path = None
         # 处理封面图片上传
         if cover_image_data and cover_image_filename:
-            #验证文件类型
-            file_ext_without_dot = os.path.splitext(cover_image_filename)[1][1:].lower() if "." in cover_image_filename else ""
+            # 验证文件类型
+            file_ext_without_dot = (
+                os.path.splitext(cover_image_filename)[1][1:].lower()
+                if "." in cover_image_filename
+                else ""
+            )
             if not file_ext_without_dot:
                 raise ValueError(f"文件名缺少扩展名: {cover_image_filename}")
             if file_ext_without_dot not in Config.ALLOWED_IMAGE_EXTENSIONS:
-                raise ValueError(f"不支持的图片格式: {file_ext_without_dot}。支持的格式: {', '.join(Config.ALLOWED_IMAGE_EXTENSIONS)}")
+                raise ValueError(
+                    f"不支持的图片格式: {file_ext_without_dot}。支持的格式: {', '.join(Config.ALLOWED_IMAGE_EXTENSIONS)}"
+                )
             # 验证文件大小
             if len(cover_image_data) == 0:
                 raise ValueError("上传的图片文件为空")
             if len(cover_image_data) > Config.MAX_IMAGE_SIZE:
-                raise ValueError(f"图片文件大小超过限制 {Config.MAX_IMAGE_SIZE / 1024 / 1024}MB")
+                raise ValueError(
+                    f"图片文件大小超过限制 {Config.MAX_IMAGE_SIZE / 1024 / 1024}MB"
+                )
         # 启动数据库事务，上下文管理器自动处理提交或回滚
         with self.transaction() as session:
             # 先创建知识库对象
@@ -75,14 +84,16 @@ class KnowledgebaseService(BaseService[Knowledgebase]):
             if cover_image_data and cover_image_filename:
                 try:
                     # 构建封面图片路径（统一使用小写扩展名）
-                    file_ext_with_dot = os.path.splitext(cover_image_filename)[1].lower()
+                    file_ext_with_dot = os.path.splitext(cover_image_filename)[
+                        1
+                    ].lower()
                     cover_image_path = f"covers/{kb.id}{file_ext_with_dot}"
                     self.logger.info(
                         f"正在为新知识库 {kb.id} 上传封面图片: "
-                                     f"文件名={cover_image_filename}, "
-                                     f"路径={cover_image_path}, "
-                                     f"大小={len(cover_image_data)} 字节"
-                        )
+                        f"文件名={cover_image_filename}, "
+                        f"路径={cover_image_path}, "
+                        f"大小={len(cover_image_data)} 字节"
+                    )
                     # 上传到存储
                     storage_service.upload_file(cover_image_path, cover_image_data)
                     # 验证文件是否成功上传
@@ -95,7 +106,9 @@ class KnowledgebaseService(BaseService[Knowledgebase]):
                     session.flush()
                     pass
                 except Exception as e:
-                    self.logger.error(f"上传知识库 {kb.id} 的封面图片时出错: {e}", exc_info=True)
+                    self.logger.error(
+                        f"上传知识库 {kb.id} 的封面图片时出错: {e}", exc_info=True
+                    )
                     cover_image_path = None
             # 刷新kb对象的数据库状态
             session.refresh(kb)
@@ -107,14 +120,24 @@ class KnowledgebaseService(BaseService[Knowledgebase]):
             return kb_dict
 
     # 定义获取知识库列表的方法
-    def list(self,user_id:str= None, page:int=1,page_size:int=10) -> Dict:
+    def list(
+        self,
+        user_id: str = None,
+        page: int = 1,
+        page_size: int = 10,
+        search: str = None,
+        sort_by: str = "created_at",
+        sort_order: str = "desc",
+    ) -> Dict:
         """
         获取知识库列表
         Args:
             user_id: 用户ID（可选）
             page: 页码
             page_size: 每页数量
-
+            search:搜索关键词（搜索名称和描述）
+            sort_by: 排序字段
+            sort_order:排序方向
         Returns:
             包含 items, total, page, page_size 的字典
         """
@@ -125,6 +148,34 @@ class KnowledgebaseService(BaseService[Knowledgebase]):
             # 如果指定了user_id，则筛选属于该用户的知识库
             if user_id:
                 query = query.filter(Knowledgebase.user_id == user_id)
+            if search:
+                # 构造模糊搜索的SQL模式
+                search_pattern = f"%{search}%"
+                # 通过SQLAlchemy的filter方法实现名称或描述字段的模糊查询
+                query = query.filter(
+                    # 名称模糊匹配
+                    (Knowledgebase.name.like(search_pattern))
+                    | (Knowledgebase.description.like(search_pattern))
+                )
+            # 排序逻辑
+            # 初始化排序字段变量
+            sort_field = None
+            # 如果排序字段为 name ,按名称排序
+            if sort_by == "name":
+                sort_field = Knowledgebase.name
+            # 如果排序字段为 updated_at ，按更新时间排序
+            elif sort_by == "updated_at":
+                sort_field = Knowledgebase.updated_at
+            # 否则默认按创建时间排序
+            else:
+                sort_field = Knowledgebase.created_at
+            # 根据排序顺序（升序或降序）添加排序
+            if sort_order == "asc":
+                # 升序排列
+                query = query.order_by(sort_field.asc())
+            else:
+                # 默认降序排列
+                query = query.order_by(sort_field.desc())
             # 统计总数
             total = query.count()
             # 计算分页偏移量
@@ -140,12 +191,12 @@ class KnowledgebaseService(BaseService[Knowledgebase]):
             # 返回包含分页信息和数据条目的字典
             return {
                 "items": items,
-                "total":total,
-                "page":page,
-                "page_size":page_size
+                "total": total,
+                "page": page,
+                "page_size": page_size,
             }
 
-    def delete(self, kb_id:str) -> bool:
+    def delete(self, kb_id: str) -> bool:
         """
         删除知识库
         Args:
@@ -162,21 +213,22 @@ class KnowledgebaseService(BaseService[Knowledgebase]):
             self.logger.info(f"Deleted knowledgebase: {kb_id}")
             return True
 
-    def get_by_id(self, kb_id:str) -> Optional[dict]:
+    def get_by_id(self, kb_id: str) -> Optional[dict]:
         """根据ID获取知识库"""
         with self.session() as session:
             kb = session.query(Knowledgebase).filter(Knowledgebase.id == kb_id).first()
             if kb:
                 return kb.to_dict()
             return None
+
     # 定义 update 方法，用于更新知识库
     def update(
-            self,
-            kb_id:str,
-            cover_image_data:bytes=None,
-            cover_image_filename:str=None,
-            delete_cover:bool=False,
-            **kwargs
+        self,
+        kb_id: str,
+        cover_image_data: bytes = None,
+        cover_image_filename: str = None,
+        delete_cover: bool = False,
+        **kwargs,
     ) -> Optional[dict]:
         """
         更新知识库
@@ -210,21 +262,29 @@ class KnowledgebaseService(BaseService[Knowledgebase]):
                 kwargs["cover_image"] = None
             elif cover_image_data and cover_image_filename:
                 # 验证文件类型
-                file_ext_without_dot = os.path.splitext(cover_image_filename)[1][
-                    1:].lower() if "." in cover_image_filename else ""
+                file_ext_without_dot = (
+                    os.path.splitext(cover_image_filename)[1][1:].lower()
+                    if "." in cover_image_filename
+                    else ""
+                )
                 if not file_ext_without_dot:
                     raise ValueError(f"文件名缺少扩展名: {cover_image_filename}")
                 if file_ext_without_dot not in Config.ALLOWED_IMAGE_EXTENSIONS:
                     raise ValueError(
-                        f"不支持的图片格式: {file_ext_without_dot}。支持的格式: {', '.join(Config.ALLOWED_IMAGE_EXTENSIONS)}")
+                        f"不支持的图片格式: {file_ext_without_dot}。支持的格式: {', '.join(Config.ALLOWED_IMAGE_EXTENSIONS)}"
+                    )
                 # 验证文件大小
                 if len(cover_image_data) == 0:
                     raise ValueError("上传的图片文件为空")
                 if len(cover_image_data) > Config.MAX_IMAGE_SIZE:
-                    raise ValueError(f"图片文件大小超过限制 {Config.MAX_IMAGE_SIZE / 1024 / 1024}MB")
+                    raise ValueError(
+                        f"图片文件大小超过限制 {Config.MAX_IMAGE_SIZE / 1024 / 1024}MB"
+                    )
                 try:
                     # 构建封面图片路径（统一使用小写扩展名）
-                    file_ext_with_dot = os.path.splitext(cover_image_filename)[1].lower()
+                    file_ext_with_dot = os.path.splitext(cover_image_filename)[
+                        1
+                    ].lower()
                     new_cover_path = f"covers/{kb.id}{file_ext_with_dot}"
                     self.logger.info(
                         f"正在处理知识库 {kb_id} 的封面图片更新: 文件名={cover_image_filename}, "
@@ -251,10 +311,12 @@ class KnowledgebaseService(BaseService[Knowledgebase]):
                     # 更新数据库中的封面路径
                     kwargs["cover_image"] = new_cover_path
                 except Exception as e:
-                    self.logger.error(f"上传知识库 {kb.id} 的封面图片时出错: {e}", exc_info=True)
+                    self.logger.error(
+                        f"上传知识库 {kb.id} 的封面图片时出错: {e}", exc_info=True
+                    )
                     raise ValueError(f"上传封面图片失败: {str(e)}")
             # 遍历要更新的字段和值
-            for key,value in kwargs.items():
+            for key, value in kwargs.items():
                 # 判断知识库对象是否有该字段，且值不为 None
                 if hasattr(kb, key) and (key == "cover_image" or value is not None):
                     # 设置该字段的新值
@@ -267,11 +329,15 @@ class KnowledgebaseService(BaseService[Knowledgebase]):
             kb_dict = kb.to_dict()
             # 如果本次更新包含'cover_image' 字段，记录详细日志
             if "cover_image" in kwargs:
-                self.logger.info(f"更新知识库 {kb_id}, 封面图片={kb_dict.get('cover_image')}")
+                self.logger.info(
+                    f"更新知识库 {kb_id}, 封面图片={kb_dict.get('cover_image')}"
+                )
             else:
-                 # 否则仅记录知识库ID
-                 self.logger.info(f"更新知识库: {kb_id}")
+                # 否则仅记录知识库ID
+                self.logger.info(f"更新知识库: {kb_id}")
             # 返回更新后的知识库字典
             return kb_dict
+
+
 # 创建KnowledgebaseService的单例对象
 kb_service = KnowledgebaseService()

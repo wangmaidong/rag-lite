@@ -1,6 +1,7 @@
 """
 知识库相关路由（视图 + API）
 """
+
 # 导入Flask中的相关模块
 from flask import (
     Blueprint,
@@ -26,7 +27,7 @@ import mimetypes
 import os
 
 # 导入认证工具函数：登录认证装饰器、获取当前用户、API登录认证装饰器
-from app.utils.auth import login_required,api_login_required,get_current_user
+from app.utils.auth import login_required, api_login_required, get_current_user
 
 # 导入自定义工具函数：异常处理装饰器、错误响应、成功响应
 from app.blueprints.utils import (
@@ -34,7 +35,8 @@ from app.blueprints.utils import (
     error_response,
     handle_api_error,
     get_pagination_params,
-    get_current_user_or_error, check_ownership
+    get_current_user_or_error,
+    check_ownership,
 )
 
 # 导入知识库服务
@@ -61,7 +63,7 @@ def api_create():
     # 设置接口功能描述
     """创建知识库"""
     # 获取当前用户，如未返回则返回错误响应
-    current_user,err = get_current_user_or_error()
+    current_user, err = get_current_user_or_error()
     if err:
         return err
     user_id = current_user["id"]
@@ -85,7 +87,7 @@ def api_create():
         # 判断请求中是否包含'cover_image'文件
         if "cover_image" in request.files:
             # 获取上传的封面图片文件对象
-            cover_file = request.files['cover_image']
+            cover_file = request.files["cover_image"]
             # 如果上传的封面图片存在且有文件名
             if cover_file and cover_file.filename:
                 # 读取文件内容为二进制数据
@@ -93,40 +95,43 @@ def api_create():
                 # 获取上传文件的文件名
                 cover_image_filename = cover_file.filename
                 # 记录封面图片上传的信息到日志，包括文件名、字节大小和内容类型
-                logger.info(f"收到新知识库的封面图片上传: 文件名={cover_image_filename}, 大小={len(cover_image_data)} 字节, 内容类型={cover_file.content_type}")
+                logger.info(
+                    f"收到新知识库的封面图片上传: 文件名={cover_image_filename}, 大小={len(cover_image_data)} 字节, 内容类型={cover_file.content_type}"
+                )
     else:
-         # 从请求中解析JSON数据
-         data = request.get_json()
-         # 校验数据是否存在以及name键是否存在
-         if not data or "name" not in data:
-             # 若校验失败，返回错误响应
-             return error_response("name is required", 400)
-         # 获取知识库名称
-         name = data["name"]
-         # 获取用户id, 可为空
-         user_id = data.get("user_id")
-         # 获取知识库描述，可为空
-         description = data.get("description")
-         # 获取分块大小，默认为512
-         chunk_size = data.get("chunk_size", 512)
-         # 获取分块重叠，默认为50
-         chunk_overlap = data.get("chunk_overlap", 50)
-         # 设置封面图片数据变量初值为None
-         cover_image_data = None
-         # 设置封面图片文件名变量初值为None
-         cover_image_filename = None
+        # 从请求中解析JSON数据
+        data = request.get_json()
+        # 校验数据是否存在以及name键是否存在
+        if not data or "name" not in data:
+            # 若校验失败，返回错误响应
+            return error_response("name is required", 400)
+        # 获取知识库名称
+        name = data["name"]
+        # 获取用户id, 可为空
+        user_id = data.get("user_id")
+        # 获取知识库描述，可为空
+        description = data.get("description")
+        # 获取分块大小，默认为512
+        chunk_size = data.get("chunk_size", 512)
+        # 获取分块重叠，默认为50
+        chunk_overlap = data.get("chunk_overlap", 50)
+        # 设置封面图片数据变量初值为None
+        cover_image_data = None
+        # 设置封面图片文件名变量初值为None
+        cover_image_filename = None
     # 调用知识库服务创建知识库，返回信息字典
     kb_dict = kb_service.create(
-        name=name, #知识库名称
-        user_id=user_id, #用户ID
-        description=description, #知识库描述
-        chunk_size=chunk_size, #分块大小
-        chunk_overlap=chunk_overlap, #分块重叠
-        cover_image_data=cover_image_data, # 封面图片数据
-        cover_image_filename=cover_image_filename # 封面图片文件名
+        name=name,  # 知识库名称
+        user_id=user_id,  # 用户ID
+        description=description,  # 知识库描述
+        chunk_size=chunk_size,  # 分块大小
+        chunk_overlap=chunk_overlap,  # 分块重叠
+        cover_image_data=cover_image_data,  # 封面图片数据
+        cover_image_filename=cover_image_filename,  # 封面图片文件名
     )
 
     return success_response(kb_dict)
+
 
 # 注册'/kb'路由，处理GET请求，显示知识库列表页面
 @bp.route("/kb")
@@ -143,13 +148,33 @@ def kb_list():
     current_user = get_current_user()
     # 获取分页参数（页码和每页大小），最大每页100
     page, page_size = get_pagination_params(max_page_size=100)
+    # 获取搜索和排序参数
+    search = request.args.get("search", "").strip() or None
+    sort_by = request.args.get("sort_by", "created_at")
+    sort_order = request.args.get("sort_order", "desc")
+    # 验证排序参数
+    if sort_by not in ["created_at", "name", "updated_at"]:
+        sort_by = "created_at"
+    if sort_order not in ["asc", "desc"]:
+        sort_order = "desc"
+
     # 调用知识库服务，获取分页后的知识库列表结果
     result = kb_service.list(
-        user_id=current_user["id"],
+        user_id=current_user["id"],  # 用户ID
         page=page,
-        page_size=page_size
+        page_size=page_size,  # 每页大小
+        search=search,  # 搜索关键词
+        sort_by=sort_by,  # 排序字段
+        sort_order=sort_order,  # 排序方向
     )
-    return render_template("kb_list.html",kbs=result["items"],pagination=result)
+    return render_template(
+        "kb_list.html",
+        kbs=result["items"],
+        pagination=result,
+        search=search or "",
+        sort_by=sort_by,
+        sort_order=sort_order,
+    )
 
 
 # 删除知识库
@@ -159,7 +184,7 @@ def kb_list():
 def api_delete(kb_id):
     """删除知识库"""
     # 尝试获取当前用户
-    current_user,err = get_current_user_or_error()
+    current_user, err = get_current_user_or_error()
     if err:
         return err
     kb_dict = kb_service.get_by_id(kb_id)
@@ -167,9 +192,7 @@ def api_delete(kb_id):
         return error_response("未找到知识库", 404)
     # 验证用户是否有权限访问该知识库
     has_permission, err = check_ownership(
-        kb_dict["user_id"],
-        current_user["id"],
-        "knowledgebase"
+        kb_dict["user_id"], current_user["id"], "knowledgebase"
     )
     if not has_permission:
         return err
@@ -177,6 +200,7 @@ def api_delete(kb_id):
     if not success:
         return error_response("未找到知识库", 404)
     return success_response("知识库删除成功")
+
 
 # 更新知识库
 # 注册PUT方法的API路由，用于更新知识库
@@ -201,9 +225,7 @@ def api_update(kb_id):
         return error_response("未找到知识库", 404)
     # 检查是否拥有操作该知识库的权限
     has_permission, err = check_ownership(
-        kb_dict["user_id"],
-        current_user["id"],
-        "knowledgebase"
+        kb_dict["user_id"], current_user["id"], "knowledgebase"
     )
     if not has_permission:
         return err
@@ -218,10 +240,10 @@ def api_update(kb_id):
         cover_image_data = None
         cover_image_filename = None
         # 获得delete_cover字段（类型字符串，需判断是否为'true'）
-        delete_cover = request.form.get('delete_cover') == 'true'
+        delete_cover = request.form.get("delete_cover") == "true"
         if "cover_image" in request.files:
             # 获取上传的封面图片文件对象
-            cover_file = request.files['cover_image']
+            cover_file = request.files["cover_image"]
             # 如果上传的封面图片存在且有文件名
             if cover_file and cover_file.filename:
                 # 读取文件内容为二进制数据
@@ -230,7 +252,8 @@ def api_update(kb_id):
                 cover_image_filename = cover_file.filename
                 # 记录封面图片上传的信息到日志，包括文件名、字节大小和内容类型
                 logger.info(
-                    f"收到新知识库的封面图片上传: 文件名={cover_image_filename}, 大小={len(cover_image_data)} 字节, 内容类型={cover_file.content_type}")
+                    f"收到新知识库的封面图片上传: 文件名={cover_image_filename}, 大小={len(cover_image_data)} 字节, 内容类型={cover_file.content_type}"
+                )
         # 组装待更新的数据字典
         update_data = {}
         if name:
@@ -247,30 +270,31 @@ def api_update(kb_id):
         if not data:
             return error_response("请求体不能为空", 400)
         update_data = {}
-        if 'name' in data:
-            update_data['name'] = data['name']
-        if 'description' in data:
-            update_data['description'] = data.get('description')
-        if 'chunk_size' in data:
-            update_data['chunk_size'] = data['chunk_size']
-        if 'chunk_overlap' in data:
-            update_data['chunk_overlap'] = data['chunk_overlap']
+        if "name" in data:
+            update_data["name"] = data["name"]
+        if "description" in data:
+            update_data["description"] = data.get("description")
+        if "chunk_size" in data:
+            update_data["chunk_size"] = data["chunk_size"]
+        if "chunk_overlap" in data:
+            update_data["chunk_overlap"] = data["chunk_overlap"]
         # JSON请求时，cover_image相关变量置空
         cover_image_data = None
         cover_image_filename = None
-        delete_cover = data.get('delete_cover', False)
+        delete_cover = data.get("delete_cover", False)
     # 调用服务进行知识库更新
     updated_kb = kb_service.update(
-        kb_id = kb_id, # 知识库ID
-        cover_image_data=cover_image_data, # 封面图片的二进制内容
-        cover_image_filename=cover_image_filename, # 封面图片文件名
-        delete_cover=delete_cover, # 是否删除封面图片
-        **update_data
+        kb_id=kb_id,  # 知识库ID
+        cover_image_data=cover_image_data,  # 封面图片的二进制内容
+        cover_image_filename=cover_image_filename,  # 封面图片文件名
+        delete_cover=delete_cover,  # 是否删除封面图片
+        **update_data,
     )
     # 如果未找到知识库，返回404
     if not updated_kb:
         return error_response("未找到知识库", 404)
     return success_response(updated_kb, "知识库更新成功")
+
 
 # 定义路由，获取指定知识库ID的封面图片，仅限登录用户访问
 @bp.route("/kb/<kb_id>/cover")
@@ -322,9 +346,9 @@ def kb_cover(kb_id):
                 mime_type = "image/jpeg"
         # 通过send_file响应图片数据和MIME类型，不以附件形式发送
         return send_file(
-            BytesIO(image_data), #图片数据
-            mimetype=mime_type,#MIME类型
-            as_attachment=False#不以附件形式发送
+            BytesIO(image_data),  # 图片数据
+            mimetype=mime_type,  # MIME类型
+            as_attachment=False,  # 不以附件形式发送
         )
     except FileNotFoundError as e:
         # 捕获文件未找到异常，记录错误日志
@@ -332,5 +356,8 @@ def kb_cover(kb_id):
         abort(404)
     except Exception as e:
         # 捕获其他未预期异常，记录错误日志（包含堆栈信息）
-        logger.error(f"提供知识库 {kb_id} 的封面图片时出错, 路径: {cover_path}, 错误: {e}", exc_info=True)
+        logger.error(
+            f"提供知识库 {kb_id} 的封面图片时出错, 路径: {cover_path}, 错误: {e}",
+            exc_info=True,
+        )
         abort(404)

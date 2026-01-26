@@ -37,9 +37,9 @@ class Config:
     # 允许上传的文件扩展名集合
     ALLOWED_EXTENSIONS = {"pdf", "docx", "txt", "md"}
     # 允许上传的图片扩展名集合
-    ALLOWED_IMAGE_EXTENSIONS = {'jpg', 'jpeg', 'png', 'gif', 'webp'}
+    ALLOWED_IMAGE_EXTENSIONS = {"jpg", "jpeg", "png", "gif", "webp"}
     # 允许上传的图片最大大小，默认为 5MB，类型为 int
-    MAX_IMAGE_SIZE = int(os.environ.get('MAX_IMAGE_SIZE', 5242880))  # 5MB
+    MAX_IMAGE_SIZE = int(os.environ.get("MAX_IMAGE_SIZE", 5242880))  # 5MB
 
     # 日志配置
     # 日志目录，默认 './logs'
@@ -67,7 +67,14 @@ class Config:
     # 数据库字符集，默认为 'utf8mb4'
     DB_CHARSET = os.environ.get("DB_CHARSET", "utf8mb4")
 
-
     # 存储配置
-    STORAGE_TYPE = os.environ.get('STORAGE_TYPE', 'local')  # 'local' 或 'minio'
-    STORAGE_DIR = os.environ.get('STORAGE_DIR', './storage')
+    STORAGE_TYPE = os.environ.get("STORAGE_TYPE", "local")  # 'local' 或 'minio'
+    STORAGE_DIR = os.environ.get("STORAGE_DIR", "./storage")
+
+    # MinIO 配置（当 STORAGE_TYPE='minio' 时使用）
+    MINIO_ENDPOINT = os.environ.get("MINIO_ENDPOINT", "")
+    MINIO_ACCESS_KEY = os.environ.get("MINIO_ACCESS_KEY", "")
+    MINIO_SECRET_KEY = os.environ.get("MINIO_SECRET_KEY", "")
+    MINIO_BUCKET_NAME = os.environ.get("MINIO_BUCKET_NAME", "rag-lite")
+    MINIO_SECURE = os.environ.get("MINIO_SECURE", "false").lower() == "true"
+    MINIO_REGION = os.environ.get("MINIO_REGION", None)

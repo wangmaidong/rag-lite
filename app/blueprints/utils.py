@@ -3,7 +3,7 @@
 """
 
 # 导入Flask用于返回JSON响应
-from flask import jsonify,request
+from flask import jsonify, request
 
 # 导入装饰器工具，用来保持原函数信息
 from functools import wraps
@@ -12,7 +12,7 @@ from functools import wraps
 from app.utils.auth import get_current_user
 
 # 导入类型提示
-from typing import Tuple,Optional
+from typing import Tuple, Optional
 
 # 导入日志模块
 import logging
@@ -92,8 +92,9 @@ def handle_api_error(func):
     # 返回包装后的函数
     return wrapper
 
+
 # 定义获取分页参数的函数，允许指定最大每页数量
-def get_pagination_params(max_page_size:int = 1000) -> Tuple[int,int]:
+def get_pagination_params(max_page_size: int = 1000) -> Tuple[int, int]:
     """
     获取分页参数
     Args:
@@ -102,7 +103,7 @@ def get_pagination_params(max_page_size:int = 1000) -> Tuple[int,int]:
         (page, page_size) 元组
     """
     # 获取请求中的 'page' 参数，默认为1，并将其转换为整数
-    page = int(request.args.get("page_size", 1))
+    page = int(request.args.get("page", 1))
     # 获取请求中的 'page_size' 参数，默认为10，并将其转换为整数
     page_size = int(request.args.get("page_size", 10))
     # 保证page 至少为1
@@ -112,6 +113,7 @@ def get_pagination_params(max_page_size:int = 1000) -> Tuple[int,int]:
 
     # 返回分页的(page, page_size)元组
     return page, page_size
+
 
 # 定义获取当前用户或返回错误的函数
 def get_current_user_or_error():
@@ -126,18 +128,16 @@ def get_current_user_or_error():
     if not current_user:
         return None, error_response("Unauthorized", 401)
     # 如果获取到用户，则返回(用户对象,None)
-    return current_user,None
+    return current_user, None
+
 
 # 定义检查资源所有权的函数，判断当前用户是否为资源所有者
 def check_ownership(
-        entity_user_id: str,
-        current_user_id:str,
-        entity_name:str = "资源"
-) -> Tuple[bool,Optional[Tuple]]:
+    entity_user_id: str, current_user_id: str, entity_name: str = "资源"
+) -> Tuple[bool, Optional[Tuple]]:
     # 检查所有资源所属用户ID是否与当前用户ID相同
     if entity_user_id != current_user_id:
         # 如果不同，返回False，并返回403未授权的错误响应
-        return False,error_response(f"Unauthorized to access this {entity_name}", 403)
+        return False, error_response(f"Unauthorized to access this {entity_name}", 403)
     # 如果相同，则有权限，返回True和None
-    return True,None
-
+    return True, None

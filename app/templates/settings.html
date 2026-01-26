@@ -1,0 +1,273 @@
+{% extends "base.html" %}
+
+{% block title %}设置 - RAG Lite{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <nav aria-label="breadcrumb" class="mb-3">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/">首页</a></li>
+                <li class="breadcrumb-item active">设置</li>
+            </ol>
+        </nav>
+
+        <h2><i class="bi bi-gear"></i> 系统设置</h2>
+        <p class="text-muted">配置模型、提示词和检索参数</p>
+
+        <form id="settingsForm" onsubmit="saveSettings(event)">
+            <!-- 标签页导航 -->
+            <ul class="nav nav-tabs mb-4" id="settingsTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="embedding-tab" data-bs-toggle="tab" data-bs-target="#embedding" type="button" role="tab">
+                        <i class="bi bi-diagram-3"></i> 向量嵌入模型
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="llm-tab" data-bs-toggle="tab" data-bs-target="#llm" type="button" role="tab">
+                        <i class="bi bi-robot"></i> 大语言模型
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="prompt-tab" data-bs-toggle="tab" data-bs-target="#prompt" type="button" role="tab">
+                        <i class="bi bi-chat-quote"></i> 提示词设置
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="retrieval-tab" data-bs-toggle="tab" data-bs-target="#retrieval" type="button" role="tab">
+                        <i class="bi bi-search"></i> 检索设置
+                    </button>
+                </li>
+            </ul>
+
+            <!-- 标签页内容 -->
+            <div class="tab-content" id="settingsTabContent">
+                <!-- 标签1: 向量嵌入模型 -->
+                <div class="tab-pane fade show active" id="embedding" role="tabpanel">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="bi bi-diagram-3"></i> 向量嵌入模型（Embedding）</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label">提供商 <span class="text-danger">*</span></label>
+                                <select class="form-select" id="embeddingProvider" name="embedding_provider" onchange="updateEmbeddingForm()" required>
+                                    <option value="huggingface">HuggingFace</option>
+                                    <option value="openai">OpenAI</option>
+                                    <option value="ollama">Ollama</option>
+                                </select>
+                                <div class="form-text">选择向量嵌入模型提供商</div>
+                            </div>
+
+                            <div class="mb-3" id="embeddingModelNameGroup">
+                                <label class="form-label">模型名称</label>
+                                <select class="form-select" id="embeddingModelName" name="embedding_model_name">
+                                    <option value="">请选择模型</option>
+                                    <!-- 动态填充 -->
+                                </select>
+                                <div class="form-text">选择模型名称或路径</div>
+                            </div>
+
+                            <div class="mb-3" id="embeddingApiKeyGroup" style="display: none;">
+                                <label class="form-label">API Key</label>
+                                <input type="password" class="form-control" id="embeddingApiKey" name="embedding_api_key" placeholder="输入 API Key">
+                                <div class="form-text">某些提供商需要 API Key</div>
+                            </div>
+
+                            <div class="mb-3" id="embeddingBaseUrlGroup" style="display: none;">
+                                <label class="form-label">Base URL</label>
+                                <input type="text" class="form-control" id="embeddingBaseUrl" name="embedding_base_url" placeholder="例如: http://localhost:11434">
+                                <div class="form-text">API Base URL（Ollama 需要）</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 标签2: 大语言模型 -->
+                <div class="tab-pane fade" id="llm" role="tabpanel">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="bi bi-robot"></i> 大语言模型（LLM）</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label">提供商 <span class="text-danger">*</span></label>
+                                <select class="form-select" id="llmProvider" name="llm_provider" onchange="updateLLMForm()" required>
+                                    <option value="deepseek">DeepSeek</option>
+                                    <option value="openai">OpenAI</option>
+                                    <option value="ollama">Ollama</option>
+                                </select>
+                                <div class="form-text">选择大语言模型提供商</div>
+                            </div>
+
+                            <div class="mb-3" id="llmModelNameGroup">
+                                <label class="form-label">模型名称</label>
+                                <select class="form-select" id="llmModelName" name="llm_model_name">
+                                    <option value="">请选择模型</option>
+                                    <!-- 动态填充 -->
+                                </select>
+                                <div class="form-text">选择模型名称</div>
+                            </div>
+
+                            <div class="mb-3" id="llmApiKeyGroup">
+                                <label class="form-label">API Key</label>
+                                <input type="password" class="form-control" id="llmApiKey" name="llm_api_key" placeholder="输入 API Key">
+                                <div class="form-text">某些提供商需要 API Key</div>
+                            </div>
+
+                            <div class="mb-3" id="llmBaseUrlGroup">
+                                <label class="form-label">Base URL</label>
+                                <input type="text" class="form-control" id="llmBaseUrl" name="llm_base_url" placeholder="例如: https://api.deepseek.com">
+                                <div class="form-text">API Base URL</div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">温度 (Temperature)</label>
+                                <input type="number" class="form-control" id="llmTemperature" name="llm_temperature" 
+                                       value="0.7" step="0.1" min="0" max="2" placeholder="0.7">
+                                <div class="form-text">控制输出的随机性，值越大越随机（0-2）</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 标签3: 提示词设置 -->
+                <div class="tab-pane fade" id="prompt" role="tabpanel">
+                    <div class="card">
+                        <div class="card-body">
+                            <!-- 子标签页导航 -->
+                            <ul class="nav nav-tabs mb-4" id="promptSubTabs" role="tablist">
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link active" id="chat-prompt-sub-tab" data-bs-toggle="tab" data-bs-target="#chat-prompt-sub" type="button" role="tab">
+                                        <i class="bi bi-chat"></i> 普通聊天提示词
+                                    </button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="rag-prompt-sub-tab" data-bs-toggle="tab" data-bs-target="#rag-prompt-sub" type="button" role="tab">
+                                        <i class="bi bi-book"></i> 知识库聊天提示词
+                                    </button>
+                                </li>
+                            </ul>
+
+                            <!-- 子标签页内容 -->
+                            <div class="tab-content" id="promptSubTabContent">
+                                <!-- 子标签1: 普通聊天提示词 -->
+                                <div class="tab-pane fade show active" id="chat-prompt-sub" role="tabpanel">
+                                    <div class="mb-4">
+                                        <label class="form-label">普通聊天系统提示词</label>
+                                        <textarea class="form-control" id="chatSystemPrompt" name="chat_system_prompt" rows="10" 
+                                                  placeholder="输入普通聊天提示词..."></textarea>
+                                        <div class="form-text mt-2">
+                                            <p class="mb-0">普通聊天提示词用于指导AI助手在普通聊天（未选择知识库）时的回答风格和行为。</p>
+                                            <p class="mb-0 mt-2"><strong>注意：</strong>这是系统消息的内容，不能使用变量。</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 子标签2: 知识库聊天提示词 -->
+                                <div class="tab-pane fade" id="rag-prompt-sub" role="tabpanel">
+                                    <div class="mb-4">
+                                        <label class="form-label">知识库聊天系统提示词</label>
+                                        <textarea class="form-control" id="ragSystemPrompt" name="rag_system_prompt" rows="6" 
+                                                  placeholder="输入知识库聊天系统提示词..."></textarea>
+                                        <div class="form-text mt-2">
+                                            <p class="mb-0">知识库聊天系统提示词用于在会话开始时设置AI助手的角色和行为。</p>
+                                            <p class="mb-0 mt-2"><strong>注意：</strong>这是系统消息的内容，不能使用变量（如 {context} 或 {question}）。</p>
+                                        </div>
+                                    </div>
+
+                                    <hr class="my-4">
+
+                                    <div class="mb-3">
+                                        <label class="form-label">知识库聊天查询提示词</label>
+                                        <textarea class="form-control" id="ragQueryPrompt" name="rag_query_prompt" rows="10" 
+                                                  placeholder="例如：文档内容：&#10;{context}&#10;&#10;问题：{question}&#10;&#10;请基于文档内容回答问题。如果文档中没有相关信息，请明确说明。"></textarea>
+                                        <div class="form-text mt-2">
+                                            <p class="mb-1">知识库聊天查询提示词用于每次提问时构建提示，指导AI助手如何基于文档内容回答问题。</p>
+                                            <p class="mb-0"><strong>必须使用以下变量：</strong></p>
+                                            <ul class="mb-0">
+                                                <li><code>{context}</code> - 检索到的文档内容（必需）</li>
+                                                <li><code>{question}</code> - 用户的问题（必需）</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 标签3: 检索设置 -->
+                <div class="tab-pane fade" id="retrieval" role="tabpanel">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="bi bi-search"></i> 检索设置</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label">检索模式 <span class="text-danger">*</span></label>
+                                <select class="form-select" id="retrievalMode" name="retrieval_mode" required>
+                                    <option value="vector">向量检索</option>
+                                    <option value="keyword">全文检索</option>
+                                    <option value="hybrid">混合检索</option>
+                                </select>
+                                <div class="form-text">选择文档检索方式</div>
+                            </div>
+
+                            <div class="mb-3" id="vectorThresholdGroup">
+                                <label class="form-label">向量检索阈值</label>
+                                <input type="number" class="form-control" id="vectorThreshold" name="vector_threshold" 
+                                       value="0.2" step="0.1" min="0" max="1" placeholder="0.2">
+                                <div class="form-text">向量相似度阈值，低于此值的文档将被过滤（0-1）</div>
+                            </div>
+
+                            <div class="mb-3" id="keywordThresholdGroup" style="display: none;">
+                                <label class="form-label">全文检索阈值</label>
+                                <input type="number" class="form-control" id="keywordThreshold" name="keyword_threshold" 
+                                       value="0.5" step="0.1" min="0" max="1" placeholder="0.5">
+                                <div class="form-text">关键词匹配阈值（0-1）</div>
+                            </div>
+
+                            <div class="mb-3" id="vectorWeightGroup" style="display: none;">
+                                <label class="form-label">向量检索权重</label>
+                                <input type="number" class="form-control" id="vectorWeight" name="vector_weight" 
+                                       value="0.7" step="0.1" min="0" max="1" placeholder="0.7">
+                                <div class="form-text">混合检索时向量检索的权重（0-1），关键词检索权重 = 1 - 向量权重</div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">TopN 结果数量</label>
+                                <input type="number" class="form-control" id="topN" name="top_n" 
+                                       value="5" min="1" max="50" placeholder="5">
+                                <div class="form-text">返回的文档数量（1-50）</div>
+                            </div>
+
+                            <div class="alert alert-info">
+                                <i class="bi bi-info-circle"></i> <strong>说明：</strong>
+                                <ul class="mb-0 mt-2">
+                                    <li><strong>向量检索：</strong>基于语义相似度检索，适合理解问题意图</li>
+                                    <li><strong>全文检索：</strong>基于关键词匹配检索，适合精确匹配</li>
+                                    <li><strong>混合检索：</strong>结合向量和关键词检索，综合两者的优势</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-end gap-2 mt-4">
+                <button type="button" class="btn btn-secondary" onclick="resetSettings()">重置</button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-save"></i> 保存设置
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+</script>
+{% endblock %}
