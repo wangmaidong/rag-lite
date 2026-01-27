@@ -141,3 +141,22 @@ def check_ownership(
         return False, error_response(f"Unauthorized to access this {entity_name}", 403)
     # 如果相同，则有权限，返回True和None
     return True, None
+
+
+# 定义函数：检查请求体是否为 JSON
+
+
+# 定义函数：检查请求体是否为 JSON
+def require_json_body():
+    """
+    检查请求是否有 JSON 体
+    :return:
+    如果存在返回 (data, None)，如果不存在返回 (None, error_response)
+    """
+    # 从请求中获取 JSON 数据
+    data = request.get_json()
+    # 如果没有获取到数据，则返回错误响应
+    if not data:
+        return None, error_response("Request body is required", 400)
+    # 如果获取到了数据，则返回数据和None表示没有错误
+    return data, None

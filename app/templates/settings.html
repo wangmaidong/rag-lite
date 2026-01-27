@@ -269,5 +269,307 @@
 
 {% block extra_js %}
 <script>
+let availableModels = {}
+// 监听页面加载完成后，执行异步函数
+document.addEventListener('DOMContentLoaded', async function() {
+   try {
+       // 发送请求获取可用模型列表
+       const modelsResponse = await fetch('/api/v1/settings/models');
+       // 解析返回的JSON数据
+       const modelsResult = await modelsResponse.json();
+       // 如果请求成功（响应码为200）
+       if (modelsResult.code === 200) {
+           // 取得可用模型数据
+           availableModels = modelsResult.data;
+           // 更新嵌入模型表单
+           updateEmbeddingForm();
+           // 更新大语言模型表单
+           updateLLMForm()
+           // 更新检索设置表单
+           updateRetrievalForm();
+           // 发送请求获取当前设置
+           const settingsResponse = await fetch('/api/v1/settings');
+           // 解析返回的JSON数据
+           const settingsResult = await settingsResponse.json();
+           // 如果请求成功（响应码为200）
+           if (settingsResult.code === 200) {
+               // 加载设置到页面
+               loadSettings(settingsResult.data);
+           }
+       }
+   } catch (error) {
+       // 捕获异常并在控制台打印错误信息
+       console.error('加载设置失败:', error);
+       // 弹窗提示加载失败
+       alert('加载设置失败: ' +  error.message);
+   }
+});
+
+function updateRetrievalForm() {
+   const mode = document.getElementById('retrievalMode').value;
+   const vectorThresholdGroup = document.getElementById('vectorThresholdGroup');
+   const keywordThresholdGroup = document.getElementById('keywordThresholdGroup');
+   const vectorWeightGroup = document.getElementById('vectorWeightGroup');
+   if (mode === 'vector') {
+       vectorThresholdGroup.style.display = 'block';
+       keywordThresholdGroup.style.display = 'none';
+       vectorWeightGroup.style.display = 'none';
+   } else if (mode === 'keyword') {
+       vectorThresholdGroup.style.display = 'none';
+       keywordThresholdGroup.style.display = 'block';
+       vectorWeightGroup.style.display = 'none';
+   } else if (mode === 'hybrid') {
+       vectorThresholdGroup.style.display = 'block';
+       keywordThresholdGroup.style.display = 'block';
+       vectorWeightGroup.style.display = 'block';
+   }
+}
+// 加载设置并填充到表单
+function loadSettings(settings) {
+   // 设置嵌入向量提供商，默认为huggingface
+   document.getElementById('embeddingProvider').value = settings.embedding_provider || 'huggingface';
+   // 设置大语言模型提供商，默认为deepseek
+    document.getElementById('llmProvider').value = settings.llm_provider || 'deepseek';
+   // 如果有嵌入模型名称，设置模型名称
+   if (settings.embedding_model_name) {
+       document.getElementById('embeddingModelName').value = settings.embedding_model_name;
+   }
+   if (settings.llm_model_name) {
+       document.getElementById('llmModelName').value = settings.llm_model_name;
+   }
+   // 设置API Key，如果没有则为空字符串
+   document.getElementById('embeddingApiKey').value = settings.embedding_api_key || '';
+   // 设置Base URL，如果没有则为空字符串
+   document.getElementById('embeddingBaseUrl').value = settings.embedding_base_url || '';
+   // 加载其他 LLM 设置
+   document.getElementById('llmApiKey').value = settings.llm_api_key || '';
+   // 设置Base URL，如果没有则为空字符串
+   document.getElementById('llmBaseUrl').value = settings.llm_base_url || '';
+   // 设置温度，如果没有则为0.7
+   document.getElementById('llmTemperature').value = settings.llm_temperature || '0.7';
+    // 加载系统提示词
+   document.getElementById('chatSystemPrompt').value = settings.chat_system_prompt || '';
+   // 加载知识库聊天系统提示词
+   document.getElementById('ragSystemPrompt').value = settings.rag_system_prompt || '';
+   // 加载知识库聊天查询提示词
+   document.getElementById('ragQueryPrompt').value = settings.rag_query_prompt || '';
+   // 设置检索模式，默认为'vector'
+   document.getElementById('retrievalMode').value = settings.retrieval_mode || 'vector';
+   // 设置向量检索阈值，默认为'0.2'
+   document.getElementById('vectorThreshold').value = settings.vector_threshold || '0.2';
+   // 设置关键词检索阈值，默认为'0.5'
+   document.getElementById('keywordThreshold').value = settings.keyword_threshold || '0.5';
+   // 设置向量权重，默认为'0.7'
+   document.getElementById('vectorWeight').value = settings.vector_weight || '0.7';
+   // 设置topN，默认为'5'
+   document.getElementById('topN').value = settings.top_n || '5';
+}
+
+// 更新嵌入模型表单（根据可用模型动态渲染选项）
+function updateEmbeddingForm() {
+    debugger
+   // 获取当前选中的提供商
+   const provider = document.getElementById('embeddingProvider').value;
+   // 获取模型选择框
+   const modelSelect = document.getElementById('embeddingModelName');
+   // 获取API Key输入框所在元素
+   const apiKeyGroup = document.getElementById('embeddingApiKeyGroup');
+   // 获取Base URL输入框所在元素
+   const baseUrlGroup = document.getElementById('embeddingBaseUrlGroup');
+   // 记住当前选中的模型值（以便刷新后尽量保留）
+   const currentValue = modelSelect.value;
+   // 清空模型下拉框内容，并加一个提示选项
+   modelSelect.innerHTML = '<option value="">请选择模型</option>';
+   // 如果存在可用模型数据，并且当前提供商有对应条目
+   if (availableModels && availableModels.embedding_models[provider]) {
+       // 获取该提供商的详细信息
+       const providerInfo = availableModels.embedding_models[provider];
+       // 遍历所有模型，添加为下拉选项
+       providerInfo.models.forEach(model => {
+           // 创建一个option元素
+           const option = document.createElement('option');
+           // 选项的值为path属性，否则为name
+           const optionValue = model.path || model.name;
+           option.value = optionValue;
+           // 构造显示文本，包括名称、维度和描述
+           const displayText = model.name +  (model.dimension ? ` (维度: ${model.dimension})` : '') +  (model.description ? ' - ' +  model.description : '');
+           option.textContent = displayText;
+           // 添加到模型下拉框
+           modelSelect.appendChild(option);
+       });
+       // 恢复刷新前选中的值（如果还有）
+       if (currentValue) {
+           // 检查当前值是否还在选项中
+           const optionExists = Array.from(modelSelect.options).some(opt => opt.value === currentValue);
+           if (optionExists) {
+               // 如果存在，直接选中
+               modelSelect.value = currentValue;
+           } else {
+               // 如果不存在，尝试“模糊匹配”
+               const matchingOption = Array.from(modelSelect.options).find(opt => {
+                   const optValue = opt.value;
+                   // 判断当前值和选项值是否完全相等或相互包含
+                   return optValue === currentValue || optValue.includes(currentValue) || currentValue.includes(optValue);
+               });
+               // 如果找到匹配项，则选中该项
+               if (matchingOption) {
+                   modelSelect.value = matchingOption.value;
+               }
+           }
+       }
+       // 根据提供商是否需要API Key，显示或隐藏输入框
+       if (providerInfo.requires_api_key) {
+           apiKeyGroup.style.display = 'block';
+           document.getElementById('embeddingApiKey').required = true;
+       } else {
+           apiKeyGroup.style.display = 'none';
+           document.getElementById('embeddingApiKey').required = false;
+       }
+       // 根据提供商是否需要Base URL，显示或隐藏输入框
+       if (providerInfo.requires_base_url) {
+           baseUrlGroup.style.display = 'block';
+       } else {
+           baseUrlGroup.style.display = 'none';
+       }
+   }
+}
+
+// 保存设置（表单提交处理函数，异步提交到后端）
+async function saveSettings(event) {
+   // 阻止表单的默认提交行为
+   event.preventDefault();
+   // 获取表单dom对象
+   const form = event.target;
+   // 构造FormData对象用于取值
+   const formData = new FormData(form);
+   // 构造要提交的数据对象
+   const data = {
+       embedding_provider: formData.get('embedding_provider'),// 嵌入模型提供商
+       embedding_model_name: formData.get('embedding_model_name') || null,// 嵌入模型名称
+       embedding_api_key: formData.get('embedding_api_key') || null,// 嵌入API Key
+       embedding_base_url: formData.get('embedding_base_url') || null,// 嵌入Base URL
+       llm_provider: formData.get('llm_provider'),// 大语言模型提供商
+       llm_model_name: formData.get('llm_model_name') || null,// 大语言模型名称
+       llm_api_key: formData.get('llm_api_key') || null,// 大语言API Key
+       llm_base_url: formData.get('llm_base_url') || null,// 大语言Base URL
+       llm_temperature: formData.get('llm_temperature') || null,// 大语言温度
+       chat_system_prompt: formData.get('chat_system_prompt') || null,// 普通聊天系统提示词
+       rag_system_prompt: formData.get('rag_system_prompt') || null,// 知识库聊天系统提示词
+       rag_query_prompt: formData.get('rag_query_prompt') || null,// 知识库聊天查询提示词
+       retrieval_mode: formData.get('retrieval_mode'),// 检索模式
+       vector_threshold: formData.get('vector_threshold') || null,// 向量检索阈值
+       keyword_threshold: formData.get('keyword_threshold') || null,// 全文检索阈值
+       vector_weight: formData.get('vector_weight') || null,// 向量检索权重
+       top_n: formData.get('top_n') || null// TopN 结果数量
+   };
+   try {
+       // 发送PUT请求到设置API，提交JSON数据
+       const response = await fetch('/api/v1/settings', {
+           method: 'PUT',
+           headers: {'Content-Type': 'application/json'},
+           body: JSON.stringify(data)
+       });
+       // 解析返回结果
+       const result = await response.json();
+       // 如果提交成功
+       if (response.ok) {
+           alert('设置保存成功！');
+           // 刷新页面
+           location.reload();
+       } else {
+           // 否则弹窗提示失败原因
+           alert('保存失败: ' +  result.message);
+       }
+   } catch (error) {
+       // 捕获异常并弹窗提示
+       alert('保存失败: ' +  error.message);
+   }
+}
+// 定义函数用于更新大语言模型（LLM）表单选项
+function updateLLMForm() {
+   // 获取大语言模型提供商的当前选中值
+   const provider = document.getElementById('llmProvider').value;
+   // 获取模型选择下拉框元素
+   const modelSelect = document.getElementById('llmModelName');
+   // 获取 API Key 输入框分组
+   const apiKeyGroup = document.getElementById('llmApiKeyGroup');
+   // 获取 Base URL 输入框分组
+   const baseUrlGroup = document.getElementById('llmBaseUrlGroup');
+
+   // 在清空模型选项前，保存一下当前选中的选项值
+   const currentValue = modelSelect.value;
+
+   // 清空模型选择下拉框的所有选项，并添加默认提示选项
+   modelSelect.innerHTML = '<option value="">请选择模型</option>';
+
+   // 判断可用模型对象及当前 provider 是否存在
+   if (availableModels && availableModels.llm_models[provider]) {
+       // 获取对应 provider 的模型信息
+       const providerInfo = availableModels.llm_models[provider];
+
+       // 遍历该 provider 的所有模型，依次添加到下拉框
+       providerInfo.models.forEach(model => {
+           // 创建 option 节点
+           const option = document.createElement('option');
+           // 设置 option 的值为模型名
+           option.value = model.name;
+           // 设置 option 的显示文本（包含模型描述）
+           option.textContent = `${model.name}${model.description ? ' - ' + model.description : ''}`;
+           // 添加 option 到下拉框
+           modelSelect.appendChild(option);
+       });
+
+       // 如果之前选中过某个值，则恢复它（仅限该值仍存在于新选项中时）
+       if (currentValue) {
+           // 检测之前选中的值是否还存在于下拉选项里
+           const optionExists = Array.from(modelSelect.options).some(opt => opt.value === currentValue);
+           if (optionExists) {
+               // 恢复之前选中的值
+               modelSelect.value = currentValue;
+           }
+       }
+
+       // 判断该 provider 是否需要 API Key，显示或隐藏 API Key 分组
+       if (providerInfo.requires_api_key) {
+           apiKeyGroup.style.display = 'block';
+           // 设置输入框为必填
+           document.getElementById('llmApiKey').required = true;
+       } else {
+           // 隐藏分组并取消必填
+           apiKeyGroup.style.display = 'none';
+           document.getElementById('llmApiKey').required = false;
+       }
+
+       // 判断该 provider 是否需要 Base URL，显示或隐藏 Base URL 分组
+       if (providerInfo.requires_base_url) {
+           baseUrlGroup.style.display = 'block';
+       } else {
+           baseUrlGroup.style.display = 'none';
+       }
+   }
+}
+function resetSettings() {
+   if (confirm('确定要重置为默认设置吗？')) {
+       loadSettings({
+           embedding_provider: 'huggingface',
+           embedding_model_name: 'sentence-transformers/all-MiniLM-L6-v2',
+           embedding_api_key: '',
+           embedding_base_url: '',
+           llm_provider: 'deepseek',
+           llm_model_name: '',
+           llm_api_key: '',
+           llm_base_url: '',
+           llm_temperature: '0.7',
+           chat_system_prompt: '你是一个专业的AI助手。请友好、准确地回答用户的问题。',
+           rag_system_prompt: '你是一个专业的AI助手。请基于文档内容回答问题。',
+           rag_query_prompt: '文档内容：\n{context}\n\n问题：{question}\n\n请基于文档内容回答问题。如果文档中没有相关信息，请明确说明。',
+           retrieval_mode: 'vector',
+           vector_threshold: '0.2',
+           keyword_threshold: '0.5',
+           vector_weight: '0.7',
+           top_n: '5'
+       });
+   }
+}
 </script>
 {% endblock %}
