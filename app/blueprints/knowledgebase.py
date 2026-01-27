@@ -361,3 +361,16 @@ def kb_cover(kb_id):
             exc_info=True,
         )
         abort(404)
+
+
+# 设置路由，访问 /kb/<kb_id> 时触发此视图函数
+@bp.route("/kb/<kb_id>")
+@login_required
+# 定义知识库详情页视图函数，接收 kb_id 作为参数
+def kb_detail(kb_id):
+    """知识库详情页面（文档管理）"""
+    kb = kb_service.get_by_id(kb_id)
+    # 如果没有找到知识库，则重定向回知识库列表页面
+    if not kb:
+        return redirect(url_for("knowledgebase.kb_list"))
+    return render_template("kb_detail.html", kb=kb)

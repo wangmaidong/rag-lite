@@ -90,6 +90,9 @@
                         <p class="card-text text-muted small">{{ kb.description or '无描述' }}</p>
                     </div>
                     <div class="card-footer bg-transparent">
+                        <a href="/kb/{{ kb.id }}" class="btn btn-sm btn-primary">
+                               <i class="bi bi-arrow-right"></i> 进入
+                        </a>
                         <button class="btn btn-sm btn-warning" data-kb-id="{{ kb.id }}" data-kb-name="{{ kb.name }}"
                             data-kb-description="{{ kb.description or '' }}" data-kb-chunk-size="{{ kb.chunk_size }}"
                             data-kb-chunk-overlap="{{ kb.chunk_overlap }}"
