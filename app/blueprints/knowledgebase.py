@@ -45,6 +45,9 @@ from app.services.knowledgebase_service import kb_service
 # 导入存储服务
 from app.services.storage_service import storage_service
 
+# 导入文档服务
+from app.services.document_service import document_service
+
 # 配置logger
 logger = logging.getLogger(__name__)
 # 创建Blueprint实例，注册在Flask应用下
@@ -373,4 +376,10 @@ def kb_detail(kb_id):
     # 如果没有找到知识库，则重定向回知识库列表页面
     if not kb:
         return redirect(url_for("knowledgebase.kb_list"))
-    return render_template("kb_detail.html", kb=kb)
+    # 获取分页参数，最大每页100条
+    page, page_size = get_pagination_params(max_page_size=100)
+    # 获取指定知识库下的文档列表，带分页
+    result = document_service.list_by_kb(kb_id, page=page, page_size=page_size)
+    return render_template(
+        "kb_detail.html", kb=kb, documents=result["items"], pagination=result
+    )

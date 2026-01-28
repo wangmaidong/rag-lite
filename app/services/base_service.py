@@ -61,3 +61,37 @@ class BaseService(Generic[T]):
             except Exception as e:
                 self.logger.error("获取ID对应的对象失败:{e}")
                 return None
+
+    # 定义通用的分页查询方法
+    def paginate_query(
+        self, query, page: int = 1, page_size: int = 10, order_by=None
+    ) -> Dict[str, Any]:
+        """
+        通用分页查询方法
+        :param query: SQLAlchemy 查询对象（必须在 session 上下文中调用）
+        :param page: 页码
+        :param page_size: 每页数量
+        :param order_by: 排序字段（可选，SQLAlchemy 表达式）
+        :return:
+            包含 items, total, page, page_size 的字典
+        """
+        # 判断是否传入排序字段（注意不能直接 if order_by，否则部分 SQLAlchemy 表达式会抛异常）
+        if order_by is not None:
+            # 如传入排序条件则按该条件排序
+            query = query.order_by(order_by)
+
+        # 获取查询结果的总条数
+        total = query.count()
+        # 计算偏移量
+        offset = (page - 1) * page_size
+        # 查询当前页的数据
+        items = query.offset(offset).limit(page_size).all()
+        # 返回结果，items 为对象列表（支持自动 to_dict 转换），同时返回 total, page, page_size
+        return {
+            "items": [
+                item.to_dict() if hasattr(item, "to_dict") else item for item in items
+            ],
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+        }
