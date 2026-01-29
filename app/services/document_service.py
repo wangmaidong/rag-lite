@@ -7,6 +7,9 @@ import uuid
 # 导入类型提示
 from typing import List, Optional, Dict
 
+# 导入线程池，用于异步处理文档
+from concurrent.futures import ThreadPoolExecutor
+
 # 导入BaseService基类
 from app.services.base_service import BaseService
 

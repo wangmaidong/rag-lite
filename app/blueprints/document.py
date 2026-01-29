@@ -91,3 +91,21 @@ def api_upload(kb_id):
     doc_dict = document_service.upload(kb_id, file_data, filename)
     # 返回成功响应及新文档信息
     return success_response(doc_dict)
+
+# 定义路由，处理 POST 请求，API 路径包含待处理文档的ID
+@bp.route("/api/v1/documents/<doc_id>/process", methods=["POST"])
+@handle_api_error
+def api_process(doc_id):
+    # 处理文档（API接口），doc_id是传入的文档ID
+    try:
+        # 调用文档服务方法，提交文档处理任务（异步）
+        document_service.process(doc_id)
+        # 返回成功响应信息，提示任务已提交
+        return success_response({"message": "文档处理任务已提交"})
+    except ValueError as e:
+        # 捕获业务异常
+        return error_response(str(e), 404)
+    except Exception as e:
+        logger.error(f"处理文档时出错: {e}", exc_info=True)
+        # 返回500通用错误响应，附带错误原因
+        return error_response(f"处理文档失败: {str(e)}", 500)
