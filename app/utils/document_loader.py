@@ -59,7 +59,7 @@ class DocumentLoader:
             raise ValueError(f"Failed to load PDF: {str(e)}")
 
     @staticmethod
-    def load_docx(file_data:bytes) -> List[Document]:
+    def load_docx(file_data: bytes) -> List[Document]:
         """
         加载 DOCX 文档
         Args:
@@ -72,7 +72,7 @@ class DocumentLoader:
         try:
             # 再次导入本地模块，保险起见
             # 创建临时docx文件，写入内容
-            with NamedTemporaryFile(delete=False,suffix=".docx") as tmp_file:
+            with NamedTemporaryFile(delete=False, suffix=".docx") as tmp_file:
                 tmp_file.write(file_data)
                 tmp_path = tmp_file.name
             # 加载和清理临时文件
@@ -91,7 +91,7 @@ class DocumentLoader:
             raise ValueError(f"Failed to load DOCX: {str(e)}")
 
     @staticmethod
-    def load_text(file_data:bytes, encoding:str="utf-8") -> List[Document]:
+    def load_text(file_data: bytes, encoding: str = "utf-8") -> List[Document]:
         """
         加载文本文件
         Args:
@@ -110,12 +110,14 @@ class DocumentLoader:
                 tmp_path = tmp_file.name
             # 加载过程及编码兜底
             try:
-
-                pass
+                # 优先尝试指定的编码
+                loader = TextLoader(tmp_path, encoding=encoding)
+                documents = loader.load()
+                return documents
             except UnicodeDecodeError:
                 # 编码失败自动用gbk重试
                 try:
-                    loader = TextLoader(tmp_path,encoding="gbk")
+                    loader = TextLoader(tmp_path, encoding="gbk")
                     documents = loader.load()
                     return documents
                 except Exception as e:
@@ -132,7 +134,7 @@ class DocumentLoader:
             raise ValueError(f"Failed to load text: {str(e)}")
 
     @staticmethod
-    def load(file_data:bytes,file_type:str) -> List[Document]:
+    def load(file_data: bytes, file_type: str) -> List[Document]:
         """
         统一加载接口
         Args:
@@ -145,15 +147,14 @@ class DocumentLoader:
         # 文件类型小写化，统一处理
         file_type = file_type.lower()
         # PDF文件
-        if file_type == 'pdf':
+        if file_type == "pdf":
             return DocumentLoader.load_pdf(file_data)
         # DOCX文件
-        elif file_type == 'docx':
+        elif file_type == "docx":
             return DocumentLoader.load_docx(file_data)
         # 文本文件/markdown
-        elif file_type in ['txt', 'md']:
+        elif file_type in ["txt", "md"]:
             return DocumentLoader.load_text(file_data)
         else:
             # 不支持文件类型抛异常
             raise ValueError(f"Unsupported file type: {file_type}")
-
