@@ -1,54 +1,39 @@
-# 模拟装饰器
-from time import sleep
-import os
+from langchain_milvus import Milvus
+from langchain_huggingface import HuggingFaceEmbeddings
+import pymilvus
+import asyncio
+async def init_milvus_async():
+    embeddings = HuggingFaceEmbeddings(
+        model_name='sentence-transformers/all-MiniLM-L6-v2',
+        model_kwargs={"device": "cpu"},
+        encode_kwargs={"normalize_embeddings":True}
+    )
+    URI = "http://49.235.139.52:19530"
+    # 获取或者创建向量存储对象
+    vectorstore = Milvus(
+        embedding_function=embeddings,
+        connection_args={
+            "uri": URI
+        },
+    )
+    return vectorstore
 
 
-def decorator1(func):
-    sleep(10)
-    print("执行 decorator1")  # 立即执行
+vectorstore = asyncio.run(init_milvus_async())
+print(vectorstore)
 
-    def wrapper1():
-        print("调用 wrapper1")  # 调用时执行
-        return func()
-
-    return wrapper1
-
-
-def decorator2(func):
-    print("执行 decorator2")  # 立即执行
-
-    def wrapper2():
-        print("调用 wrapper2")  # 调用时执行
-        return func()
-
-    return wrapper2
+# 先测试基本连接
+# try:
+#     # 直接使用 pymilvus 测试连接
+#     connections = pymilvus.connections
+#     connections.connect(
+#         alias="default",
+#         host='49.235.139.52',
+#         port='19530'
+#     )
+#     print("连接成功")
+#     connections.disconnect("default")
+# except Exception as e:
+#     print(f"连接失败: {e}")
 
 
-def decorator3(func):
-    print("执行 decorator3")  # 立即执行
-
-    def wrapper3():
-        print("调用 wrapper3")  # 调用时执行
-        return func()
-
-    return wrapper3
-
-
-# 原始函数
-def my_func():
-    print("原始函数执行")
-
-
-print("=== 开始应用装饰器 ===")
-decorated = decorator1(decorator2(decorator3(my_func)))
-print("=== 装饰器应用完成 ===")
-
-print("\n=== 调用装饰后的函数 ===")
-decorated()
-
-
-file1 = "a/b/c/readme.md"
-path1 = "f/j/k/l"
-
-print(os.path.splitext(file1))
-print(os.path.splitext(path1))

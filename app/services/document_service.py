@@ -34,6 +34,8 @@ from app.utils.text_splitter import TextSplitter
 # 导入LangChain文档对象
 from langchain_core.documents import Document
 
+# 导入向量数据库服务
+from app.services.vector_service import vector_service
 
 # 定义DocumentService服务类，继承自BaseService
 
@@ -232,6 +234,7 @@ class DocumentService(BaseService[DocumentModel]):
                 file_path = doc.file_path
                 file_type = doc.file_type
                 doc_name = doc.name
+                collection_name = f"kb_{doc.kb_id}" if need_cleanup else None
                 # 查询知识库配置
                 kb: Knowledgebase = (
                     session.query(Knowledgebase)
@@ -244,6 +247,20 @@ class DocumentService(BaseService[DocumentModel]):
                 # 获取知识库分块参数
                 kb_chunk_size = kb.chunk_size
                 kb_chunk_overlap = kb.chunk_overlap
+
+            # 如果需要清理旧分块和向量，则在事务作用域外先进行删除，避免占用数据库连接
+            if need_cleanup:
+                try:
+                    # 调用向量服务，则删除指定集合、指定文档ID下的所有向量数据
+                    vector_service.delete_documents(
+                        collection_name=collection_name,
+                        filter={"doc_id":doc_id}
+                    )
+                    # 输出信息日志，标明文档的旧向量已被删除
+                    self.logger.info(f"已删除文档 {doc_id} 的旧向量")
+                except Exception as e:
+                    # 如果删除操作出错，则记录警告日志
+                    self.logger.warning(f"删除向量时出错: {e}")
 
             # 日志：文档已标记为处理中
             self.logger.info(f"文档 {doc_id} 状态已更新为 processing（处理中）")
@@ -263,6 +280,33 @@ class DocumentService(BaseService[DocumentModel]):
             # 如果分块失败，抛出异常
             if not chunks:
                 raise ValueError("文档未能成功分块")
+            # 初始化一个列表用于存放转换后的 LangChain Document 对象
+            documents = []
+            # 遍历所有分块，将每个分块转换为 LangChain Document 对象
+            for chunk in chunks:
+                # 创建一个 LangChain Document，包含文本内容和相关元数据
+                doc_obj = Document(
+                    page_content=chunk["text"],
+                    metadata={
+                        "doc_id": doc_id,
+                        "doc_name":doc_name,
+                        "chunk_index": chunk["chunk_index"],
+                        "id": chunk["id"],
+                        "chunk_id":chunk["id"]
+                    }
+                )
+                # 将生成的 Document 对象加入到 documents 列表
+                documents.append(doc_obj)
+            # 构造向量库集合名称，格式为 kb_知识库ID
+            collection_name = f"kb_{kb_id}"
+            # 提取所有分块的ID,用于向量存储
+            ids = [ chunk["id"] for chunk in chunks]
+            # 调用向量服务，将分块后的文档写入向量库
+            vector_service.add_documents(
+                collection_name=collection_name,
+                documents=documents,
+                ids=ids
+            )
             # 再次开启事务，更新文档状态为完成，记录分块数
             with self.transaction() as session:
                 doc = (

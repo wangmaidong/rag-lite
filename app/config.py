@@ -79,6 +79,12 @@ class Config:
     MINIO_SECURE = os.environ.get("MINIO_SECURE", "false").lower() == "true"
     MINIO_REGION = os.environ.get("MINIO_REGION", None)
 
+    # 向量数据库配置
+    VECTORDB_TYPE = os.environ.get("VECTORDB_TYPE", "chroma")
+    CHROMA_PERSIST_DIRECTORY = os.environ.get("CHROMA_PERSIST_DIRECTORY","./chroma_db")
+    MILVUS_HOST=  os.environ.get("MILVUS_HOST","49.235.139.52")
+    MILVUS_PORT= os.environ.get("MILVUS_PORT",19530)
+    MILVUS_DB_NAME = os.environ.get("MILVUS_DB_NAME", "default")
     DEEPSEEK_CHAT_MODEL = os.environ.get("DEEPSEEK_CHAT_MODEL", "deepseek-chat")
     DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY") or os.getenv("OPENAI_API_KEY_DEEP")
     DEEPSEEK_BASE_URL = os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
