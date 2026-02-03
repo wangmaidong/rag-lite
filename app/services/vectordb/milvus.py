@@ -4,16 +4,22 @@ Milvus 向量数据库实现
 """
 # 导入日志模块
 import logging
+
 # 导入Milvus类
 from langchain_milvus import Milvus
+
 # 导入类型提示相关模块
 from typing import List, Dict, Optional, Any
+
 # 导入LangChain的文档类型
 from langchain_core.documents import Document
+
 # 导入向量数据库接口基类
 from app.services.vectordb.base import VectorDBInterface
+
 # 导入Embedding工厂方法
 from app.utils.embedding_factory import EmbeddingFactory
+from test import vectorstore
 
 # 获取日志记录器
 logger = logging.getLogger(__name__)
@@ -34,10 +40,7 @@ class MilvusVectorDB(VectorDBInterface):
         """
         # 如果没有传递连接参数，则使用默认主机和端口
         if connection_args is None:
-            connection_args = {
-                "uri": "http://localhost:19530",
-                "db_name": "default"
-            }
+            connection_args = {"uri": "http://localhost:19530", "db_name": "default"}
         # 保存连接参数到实例
         self.connection_args = connection_args
 
@@ -54,13 +57,13 @@ class MilvusVectorDB(VectorDBInterface):
         # 创建 Milvus 向量存储对象，如果集合不存在会自动创建
         # LangChain Milvus 会自动处理集合、索引创建和加载
         vectorstore = Milvus(
-            collection_name=collection_name,#集合名称
-            embedding_function=self.embeddings,#embedding模型
-            connection_args=connection_args,#连接参数
+            collection_name=collection_name,  # 集合名称
+            embedding_function=self.embeddings,  # embedding模型
+            connection_args=connection_args,  # 连接参数
         )
 
         # 如果集合对象有 _collection 属性，尝试加载已有集合（如果已经存在）
-        if hasattr(vectorstore, '_collection'):
+        if hasattr(vectorstore, "_collection"):
             try:
                 # 尝试加载集合
                 vectorstore._collection.load()
@@ -73,8 +76,12 @@ class MilvusVectorDB(VectorDBInterface):
         return vectorstore
 
     # 添加文档到 Milvus 的方法
-    def add_documents(self, collection_name: str, documents: List[Document],
-                     ids: Optional[List[str]] = None) -> List[str]:
+    def add_documents(
+        self,
+        collection_name: str,
+        documents: List[Document],
+        ids: Optional[List[str]] = None,
+    ) -> List[str]:
         """添加文档到向量存储"""
         # 获取（或创建）对应的集合
         vectorstore = self.get_or_create_collection(collection_name)
@@ -88,21 +95,29 @@ class MilvusVectorDB(VectorDBInterface):
 
             # 确保数据写入并刷新到磁盘
             # 通过内部 _collection 对象手动刷新
-            if hasattr(vectorstore, '_collection'):
-                vectorstore._collection.flush()#刷新集合
+            if hasattr(vectorstore, "_collection"):
+                vectorstore._collection.flush()  # 刷新集合
                 logger.debug(f"已刷新 Milvus 集合 {collection_name}")
 
             # 记录添加文档的日志
-            logger.info(f"已向 Milvus 集合 {collection_name} 添加 {len(documents)} 个文档")
-            return result_ids#返回结果
+            logger.info(
+                f"已向 Milvus 集合 {collection_name} 添加 {len(documents)} 个文档"
+            )
+            return result_ids  # 返回结果
         except Exception as e:
             # 添加失败时打印错误日志并抛出异常
-            logger.error(f"向 Milvus 集合 {collection_name} 添加文档时出错: {e}", exc_info=True)
+            logger.error(
+                f"向 Milvus 集合 {collection_name} 添加文档时出错: {e}", exc_info=True
+            )
             raise
 
     # 删除文档的方法
-    def delete_documents(self, collection_name: str, ids: Optional[List[str]] = None,
-                        filter: Optional[Dict] = None) -> None:
+    def delete_documents(
+        self,
+        collection_name: str,
+        ids: Optional[List[str]] = None,
+        filter: Optional[Dict] = None,
+    ) -> None:
         """删除文档"""
         # 获取（或创建）指定名称的向量集合
         vectorstore = self.get_or_create_collection(collection_name)
@@ -123,3 +138,62 @@ class MilvusVectorDB(VectorDBInterface):
         # 记录删除操作的日志
         logger.info(f"已经从ChromDB集合{collection_name}删除文档")
 
+    # 定义相似度搜索方法
+    def similarity_search(
+        self,
+        collection_name: str,
+        query: str,
+        k: int = 5,
+        filter: Optional[Dict] = None,
+    ) -> List[Document]:
+        """相似度搜索"""
+        vectorstore = self.get_or_create_collection(collection_name)
+        # 检查集合是否已被加载（LangChain Milvus 一般自动处理，这里显式保证）
+        if hasattr(vectorstore, "_collection"):
+            try:
+                # 显式加载集合
+                vectorstore._collection.load()
+            except Exception as e:
+                # 如果加载失败或已加载，记录到 debug 日志
+                logger.debug(f"集合可能已加载或加载失败: {e}")
+        # 如果指定了过滤条件
+        if filter:
+            # 使用过滤条件表达式地相似度搜索
+            results = vectorstore.similarity_search(query=query, k=k, expr=filter)
+        else:
+            # 不带过滤条件，直接搜索
+            results = vectorstore.similarity_search(query=query, k=k)
+        # 返回搜索结果
+        return results
+
+    # 定义带分数的相似度搜索方法
+    def similarity_search_with_score(
+        self,
+        collection_name: str,
+        query: str,
+        k: int = 5,
+        filter: Optional[Dict] = None,
+    ) -> List[tuple]:
+        """带分数的相似度搜索方法"""
+        vectorstore = self.get_or_create_collection(collection_name)
+        # 检查集合是否已被加载（LangChain Milvus 一般自动处理，这里显式保证）
+        if hasattr(vectorstore, "_collection"):
+            try:
+                # 显式加载集合
+                vectorstore._collection.load()
+            except Exception as e:
+                # 如果加载失败或已加载，记录到 debug 日志
+                logger.debug(f"集合可能已加载或加载失败: {e}")
+        # 如果传递了过滤条件
+        if filter:
+            # 根据过滤条件构造Milvus的过滤表达式，只支持doc_id精准查询
+            expr = f'doc_id == "{filter["doc_id"]}"'
+            # 带过滤表达式执行相似度检索，并拿到分数
+            results = vectorstore.similarity_search_with_score(
+                query=query, k=k, expr=expr
+            )
+            print("filter_results", len(results))
+        else:
+            # 如果没有过滤条件，直接执行检索
+            results = vectorstore.similarity_search_with_score(query=query, k=k)
+        return results

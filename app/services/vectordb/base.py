@@ -1,12 +1,16 @@
 """
 向量数据库抽象接口
 """
+
 # 导入 abc 库，定义抽象基类和抽象方法
 from abc import ABC, abstractmethod
+
 # 导入类型提示：列表、字典、可选和任意类型
 from typing import List, Dict, Optional, Any
+
 # 导入 LangChain 的 Document 类，用于文档对象
 from langchain_core.documents import Document
+
 
 # 定义一个向量数据库的抽象接口，继承自 ABC 抽象基类
 class VectorDBInterface(ABC):
@@ -29,8 +33,12 @@ class VectorDBInterface(ABC):
 
     # 定义抽象方法：向向量存储中添加文档
     @abstractmethod
-    def add_documents(self, collection_name: str, documents: List[Document],
-                     ids: Optional[List[str]] = None) -> List[str]:
+    def add_documents(
+        self,
+        collection_name: str,
+        documents: List[Document],
+        ids: Optional[List[str]] = None,
+    ) -> List[str]:
         """
         添加文档到向量存储
 
@@ -44,10 +52,15 @@ class VectorDBInterface(ABC):
         """
         # 子类需要实现具体逻辑
         pass
+
     # 定义抽象方法：删除指定的文档
     @abstractmethod
-    def delete_documents(self, collection_name: str, ids: Optional[List[str]] = None,
-                        filter: Optional[Dict] = None) -> None:
+    def delete_documents(
+        self,
+        collection_name: str,
+        ids: Optional[List[str]] = None,
+        filter: Optional[Dict] = None,
+    ) -> None:
         """
         删除文档
 
@@ -57,4 +70,46 @@ class VectorDBInterface(ABC):
             filter: 过滤条件（可选）
         """
         # 子类需要实现具体逻辑
+        pass
+
+    @abstractmethod
+    def similarity_search(
+        self,
+        collection_name: str,
+        query: str,
+        k: int = 5,
+        filter: Optional[Dict] = None,
+    ) -> List[Document]:
+        """
+        相似度搜索
+        Args:
+            collection_name: 集合名称
+            query: 查询文本
+            k: 返回结果数量
+            filter: 元数据过滤条件
+
+        Returns:
+            检索到的 Document 列表
+        """
+
+    @abstractmethod
+    def similarity_search_with_score(
+        self,
+        collection_name: str,
+        query: str,
+        k: int = 5,
+        filter: Optional[Dict] = None,
+    ) -> List[tuple]:
+        """
+        相似度搜索（带分数）
+        Args:
+            collection_name: 集合名称
+            query: 查询文本
+            k: 返回结果数量
+            filter: 元数据过滤条件
+
+        Returns:
+            (Document, score) 元组列表
+
+        """
         pass

@@ -1,30 +1,37 @@
 """
 ChromaDB 向量数据库实现
 """
+
 # 导入日志模块
 import logging
+
 # 导入需要的类型提示
 from typing import List, Dict, Optional, Any
+
 # 导入LangChain 的 Chroma类
 from langchain_chroma import Chroma
+
 # 导入Document类
 from langchain_core.documents import Document
+
 # 导入向量数据库接口基类
 from app.services.vectordb.base import VectorDBInterface
+
 # 导入全局配置
 from app.config import Config
+
 # 导入嵌入模型工厂
 from app.utils.embedding_factory import EmbeddingFactory
+from test import vectorstore
+
 # 获取日志记录器
 logger = logging.getLogger(__name__)
+
 
 # 定义 Chroma 向量数据库实现类
 class ChromaVectorDB(VectorDBInterface):
     # 初始化方法
-    def __init__(
-            self,
-            persist_directory:Optional[str]=None
-    ):
+    def __init__(self, persist_directory: Optional[str] = None):
         """
         初始化 ChromaDB 服务
         Args:
@@ -41,20 +48,21 @@ class ChromaVectorDB(VectorDBInterface):
         logger.info(f"ChromaDB 已初始化, 持久化目录: {persist_directory}")
 
     # 获取或创建集合（向量存储）
-    def get_or_create_collection(self,collection_name:str) -> Chroma:
+    def get_or_create_collection(self, collection_name: str) -> Chroma:
         # 获取或创建向量存储对象
         vectorstore = Chroma(
             collection_name=collection_name,
             embedding_function=self.embeddings,
-            persist_directory=self.persist_directory
+            persist_directory=self.persist_directory,
         )
         return vectorstore
+
     # 向向量存储添加文档
     def add_documents(
         self,
-        collection_name:str,
-        documents:List[Document],
-        ids:Optional[List[str]]=None
+        collection_name: str,
+        documents: List[Document],
+        ids: Optional[List[str]] = None,
     ) -> List[str]:
         # 获取集合
         vectorstore = self.get_or_create_collection(collection_name)
@@ -66,7 +74,9 @@ class ChromaVectorDB(VectorDBInterface):
             # 添加文档，不指定ids
             result_ids = vectorstore.add_documents(documents=documents)
         # 记录日志，添加文档
-        logger.info(f"已向 ChromaDB 集合 {collection_name} 添加 {len(documents)} 个文档")
+        logger.info(
+            f"已向 ChromaDB 集合 {collection_name} 添加 {len(documents)} 个文档"
+        )
         # 返回已添加文档的id列表
         return result_ids
 
@@ -75,7 +85,7 @@ class ChromaVectorDB(VectorDBInterface):
         self,
         collection_name: str,
         ids: Optional[List[str]] = None,
-        filter: Optional[Dict] = None
+        filter: Optional[Dict] = None,
     ) -> None:
         vectorstore = self.get_or_create_collection(collection_name)
         if ids:
@@ -89,7 +99,7 @@ class ChromaVectorDB(VectorDBInterface):
                 # filter 格式: {"doc_id": "xxx"}
                 where = filter
                 results = collectin.get(where=where)
-                if results and "ids" in results and results['ids']:
+                if results and "ids" in results and results["ids"]:
                     matched_ids = results["ids"]
                     vectorstore.delete(ids=matched_ids)
                     logger.info(f"已通过filter条件删除{len(matched_ids)}个文档")
@@ -101,3 +111,41 @@ class ChromaVectorDB(VectorDBInterface):
         else:
             raise ValueError(f"你既没有传ids,也没有传filter")
         logger.info(f"已经从ChromDB集合{collection_name}删除文档")
+
+    def similarity_search(
+        self,
+        collection_name: str,
+        query: str,
+        k: int = 5,
+        filter: Optional[Dict] = None,
+    ) -> List[Document]:
+        """相似度搜索"""
+        # 获取或创建集合对应的向量存储对象
+        vectorstore = self.get_or_create_collection(collection_name)
+        # 如果指定了过滤条件
+        if filter:
+            # 带过滤条件地执行相似度搜索
+            results = vectorstore.similarity_search(query=query, k=k, filter=filter)
+        else:
+            # 不带过滤条件地执行相似度搜索
+            results = vectorstore.similarity_search(query=query, k=k)
+        # 返回搜索结果
+        return results
+
+    # 定义带分数地相似度搜索方法
+    def similarity_search_with_score(
+        self,
+        collection_name: str,
+        query: str,
+        k: int = 5,
+        filter: Optional[Dict] = None,
+    ) -> List[tuple]:
+        """用于执行带分数的相似度搜索"""
+        vectorstore = self.get_or_create_collection(collection_name)
+        if filter:
+            results = vectorstore.similarity_search_with_score(
+                query=query, k=k, filter=filter
+            )
+        else:
+            results = vectorstore.similarity_search_with_score(query=query, k=k)
+        return results

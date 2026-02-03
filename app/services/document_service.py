@@ -253,8 +253,7 @@ class DocumentService(BaseService[DocumentModel]):
                 try:
                     # 调用向量服务，则删除指定集合、指定文档ID下的所有向量数据
                     vector_service.delete_documents(
-                        collection_name=collection_name,
-                        filter={"doc_id":doc_id}
+                        collection_name=collection_name, filter={"doc_id": doc_id}
                     )
                     # 输出信息日志，标明文档的旧向量已被删除
                     self.logger.info(f"已删除文档 {doc_id} 的旧向量")
@@ -289,23 +288,21 @@ class DocumentService(BaseService[DocumentModel]):
                     page_content=chunk["text"],
                     metadata={
                         "doc_id": doc_id,
-                        "doc_name":doc_name,
+                        "doc_name": doc_name,
                         "chunk_index": chunk["chunk_index"],
                         "id": chunk["id"],
-                        "chunk_id":chunk["id"]
-                    }
+                        "chunk_id": chunk["id"],
+                    },
                 )
                 # 将生成的 Document 对象加入到 documents 列表
                 documents.append(doc_obj)
             # 构造向量库集合名称，格式为 kb_知识库ID
             collection_name = f"kb_{kb_id}"
             # 提取所有分块的ID,用于向量存储
-            ids = [ chunk["id"] for chunk in chunks]
+            ids = [chunk["id"] for chunk in chunks]
             # 调用向量服务，将分块后的文档写入向量库
             vector_service.add_documents(
-                collection_name=collection_name,
-                documents=documents,
-                ids=ids
+                collection_name=collection_name, documents=documents, ids=ids
             )
             # 再次开启事务，更新文档状态为完成，记录分块数
             with self.transaction() as session:
@@ -334,6 +331,51 @@ class DocumentService(BaseService[DocumentModel]):
                     doc.error_message = str(e)[:500]
             # 记录处理失败的日志
             self.logger.error(f"处理文档 {doc_id} 时发生错误: {e}")
+
+    def delete(self, doc_id):
+        """
+        删除文档
+        包括：删除向量数据库中的向量数据、删除存储中的文件、删除数据库记录
+        Args:
+            doc_id:
+
+        Returns:
+
+        """
+        with self.session() as session:
+            doc = (
+                session.query(DocumentModel).filter(DocumentModel.id == doc_id).first()
+            )
+            if not doc:
+                raise ValueError(f"文档{doc_id}不存在")
+
+            # 保存需要删除的信息
+            kb_id = doc.kb_id
+            file_path = doc.file_path
+            collection_name = f"kb_{kb_id}"
+        # 1. 删除向量数据库中的相关向量数据
+        try:
+            vector_service.delete_documents(
+                collection_name=collection_name, filter={"doc_id": doc_id}
+            )
+            self.logger.info(f"已删除文档{doc_id}的向量数据")
+        except Exception as e:
+            self.logger.warning(f"删除向量数据失败：{e}")
+        # 2. 删除存储中的文件
+        if file_path:
+            try:
+                storage_service.delete_file(file_path)
+                self.logger.info(f"已删除文档{doc_id}的存储文件:{file_path}")
+            except Exception as e:
+                self.logger.warning(f"删除存储文件失败:{e}")
+        # 3. 删除数据库记录
+        with self.transaction() as session:
+            doc = (
+                session.query(DocumentModel).filter(DocumentModel.id == doc_id).first()
+            )
+            if doc:
+                session.delete(doc)
+                self.logger.info(f"已删除文档{doc_id}的数据库记录")
 
 
 # 实例化DocumentService
