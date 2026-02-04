@@ -1,8 +1,10 @@
 # 从基础服务导入BaseService类
-from app.services.base_service import BaseService, T
+from app.services.base_service import BaseService
 
 # 从模型模块导入Knowledgebase类
 from app.models.knowledgebase import Knowledgebase
+# 从模型模块导入Document类
+from app.models.document import Document as DocumentModel
 
 # 导入类型说明
 from typing import Optional, Dict
@@ -13,6 +15,10 @@ from app.config import Config
 # 导入存储服务
 from app.services.storage_service import storage_service
 
+# 导入向量服务
+from app.services.vector_service import vector_service
+
+from typing import List
 
 # 定义KnowledgebaseService服务类，继承自BaseService，泛型参数为Knowledgebase
 class KnowledgebaseService(BaseService[Knowledgebase]):
@@ -205,12 +211,58 @@ class KnowledgebaseService(BaseService[Knowledgebase]):
         Returns: 是否删除成功
 
         """
+        # 1.获取知识库信息
+        with self.session() as session:
+            kb:Knowledgebase = session.query(Knowledgebase).filter(Knowledgebase.id == kb_id).first()
+            if not kb:
+                raise ValueError(f"知识库{kb_id}不存在")
+
+            # 保存需要删除的信息
+            kb_name = kb.name
+            cover_image_path = kb.cover_image if kb.cover_image else None
+            # 获取知识库下的所有文档
+            documents:List[DocumentModel] = session.query(DocumentModel).filter(DocumentModel.kb_id == kb_id).all()
+            doc_ids = [doc.id for doc in documents]
+            doc_file_paths = [doc.file_path for doc in documents if doc.file_path]
+
+        collection_name = f"kb_{kb_id}"
+        # 2. 删除向量数据库集合中的所有向量数据
+        if doc_ids:
+            try:
+                # 逐个删除每个文档的向量数据
+                for doc_id in doc_ids:
+                    try:
+                        vector_service.delete_documents(
+                            collection_name=collection_name,
+                            filter={"doc_id":doc_id}
+                        )
+                    except Exception as e:
+                        self.logger.warning(f"删除文档{doc_id}的向量数据失败:{e}")
+                self.logger.info(f"已删除知识库{kb_id}的向量数据")
+            except Exception as e:
+                self.logger.warning(f"删除向量数据失败:{e}")
+        # 3. 删除所有文档的存储文件
+        for file_path in doc_file_paths:
+            if file_path:
+                try:
+                    storage_service.delete_file(file_path)
+                    self.logger.info(f"已删除文档存储文件:{file_path}")
+                except Exception as e:
+                    self.logger.warning(f"删除文档存储文件失败:{file_path}, 错误:{e}")
+        # 4. 删除知识库的封面图片
+        if cover_image_path:
+            try:
+                storage_service.delete_file(cover_image_path)
+                self.logger.info(f"已删除知识库封面图片:{cover_image_path}")
+            except Exception as e:
+                self.logger.warning(f"删除封面图片失败:{e}")
+        # 5. 删除知识库的数据库记录（由于 CASCADE，文档记录会自动删除）
         with self.transaction() as session:
             kb = session.query(Knowledgebase).filter(Knowledgebase.id == kb_id).first()
             if not kb:
                 return False
             session.delete(kb)
-            self.logger.info(f"Deleted knowledgebase: {kb_id}")
+            self.logger.info(f"已删除知识库:{kb_id} {kb_name}")
             return True
 
     def get_by_id(self, kb_id: str) -> Optional[dict]:
