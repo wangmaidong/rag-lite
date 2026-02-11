@@ -466,7 +466,6 @@
         }
         document.getElementById('questionInput').value = ''
         scrollToBottom()
-
         try {
             const url = currentKbId ? `/api/v1/knowledgebases/${currentKbId}/chat` : `/api/v1/chat`
             const response = await fetch(url, {
@@ -515,7 +514,6 @@
                             fullAnswer += chunk.content
                             scheduleRender()
                         } else if (chunk.type == 'done') {//当回答完成之后
-                            debugger
                             renderMarkdownToElement(answerContent, fullAnswer)
                             renderSources(chunk.sources, chunk.metadata, answerDiv, currentKbId)
                         } else if (chunk.type == 'error') {

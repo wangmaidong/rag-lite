@@ -11,7 +11,7 @@ from app.blueprints.utils import (
     success_response,
     error_response,
     get_current_user_or_error,
-    get_pagination_params
+    get_pagination_params,
 )
 
 # 导入知识库服务，用于后续业务逻辑
@@ -43,13 +43,13 @@ def chat_view():
 
 
 # 注册 API 路由，处理聊天接口 POST 请求
-@bp.route("/api/v1/knowledgebases/chat", methods=["POST"])
+@bp.route("/api/v1/chat", methods=["POST"])
 @api_login_required
 @handle_api_error
 def api_chat():
     """普通聊天接口不支持知识库，支持流式输出"""
     # 获取当前用户和错误信息
-    current_user, err = get_current_user()
+    current_user, err = get_current_user_or_error()
     # 如果有错误，直接返回错误响应
     if err:
         return err
@@ -78,27 +78,22 @@ def api_chat():
     # 如果请求中带有session_id 说明有现有会话
     if session_id:
         # 根据session_id和当前用户ID获取历史消息列表
-        history_messages = session_service.get_message(session_id,current_user["id"])
+        history_messages = session_service.get_message(session_id, current_user["id"])
         # 将历史消息转换为对话格式，仅保留最近10条
         history = [
-            {
-                "role": msg.get("role"),
-                "content": msg.get("content")
-            }
+            {"role": msg.get("role"), "content": msg.get("content")}
             for msg in history_messages[-10:]
         ]
 
     # 如果请求中没有session_id，说明是新对话，需要新建会话
     if not session_id:
         # 创建新会话，kb_id 设为None表示普通聊天
-        chat_session = session_service.create_session(
-            user_id=current_user["id"]
-        )
+        chat_session = session_service.create_session(user_id=current_user["id"])
         # 使用新创建会话的ID作为本次会话
         session_id = chat_session["id"]
 
     # 将用户的问题消息保存到当前会话中
-    session_service.add_message(session_id,"user",question)
+    session_service.add_message(session_id, "user", question)
 
     # 声明用于流式输出的生成器
     @stream_with_context
@@ -108,15 +103,21 @@ def api_chat():
             full_answer = ""
             # 调用服务进行流式对话
             for chunk in chat_service.chat_stream(
-                question=question, temperature=None, max_tokens=max_tokens
+                question=question,
+                temperature=None,
+                max_tokens=max_tokens,
+                history=history,
             ):
                 # 如果是内容块，则拼接内容到full_answer
                 if chunk.get("type") == "content":
                     full_answer += chunk.get("content", "")
                 # 以 SSE 协议格式输出数据
-                yield f"data:{json.dumps(chunk, ensure_ascii=False)}\n\n"
+                yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
             # 输出对话完成信号
             yield "data: [DONE]\n\n"
+            # 保存助手回复
+            if full_answer:
+                session_service.add_message(session_id, "assistant", full_answer)
         except Exception as e:
             # 发生异常记录日志
             logger.error(f"流式输出时出错: {e}")
@@ -124,15 +125,114 @@ def api_chat():
             error_chunk = {"type": "error", "content": str(e)}
             # 输出错误数据块
             yield f"data: {json.dumps(error_chunk, ensure_ascii=False)}\n\n"
-        # 创建 Response 对象，设置必要的 SSE 响应头部
-        response = Response(
-            generate(),
-            mimetype="text/event-stream",
-            headers={
-                "Cache-Control": "no-cache",
-                "Connection": "keep-alive",
-                "X-Accel-Buffering": "no",
-                "Content-Type": "text/event-stream;charset=utf-8",
-            },
-        )
-        return response
+
+    # 创建 Response 对象，设置必要的 SSE 响应头部
+    response = Response(
+        generate(),
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+            "Content-Type": "text/event-stream;charset=utf-8",
+        },
+    )
+    return response
+
+
+# 路由装饰器，定义 GET 方法获取会话列表的接口
+@bp.route("/api/v1/sessions", methods=["GET"])
+@api_login_required
+@handle_api_error
+def api_list_sessions():
+    """获取当前用户的会话列表"""
+    # 获取当前用户，如有错误直接返回错误响应
+    current_user, err = get_current_user_or_error()
+    if err:
+        return err
+    # 获取分页参数（页码和每页数量），最大单页1000
+    page, page_size = get_pagination_params(max_page_size=1000)
+    # 调用会话服务获取当前用户的会话列表
+    result = session_service.list_sessions(
+        current_user["id"], page=page, page_size=page_size
+    )
+    # 以统一成功响应格式返回会话列表
+    return success_response(result)
+
+
+# 路由装饰器，定义 POST 方法创建会话的接口
+@bp.route("/api/v1/sessions", methods=["POST"])
+@api_login_required
+@handle_api_error
+def api_create_session():
+    """创建新的聊天会话"""
+    # 获取当前用户，如果有错误直接返回
+    current_user, err = get_current_user_or_error()
+    if err:
+        return err
+    # 获取请求体中的JSON数据，如无则返回空字典
+    data = request.get_json() or {}
+    # 获取会话标题
+    title = data.get("title")
+    # 调用服务创建会话，传入当前用户ID、知识库ID与标题
+    session_obj = session_service.create_session(
+        user_id=current_user["id"], title=title
+    )
+    # 返回成功响应及会话对象
+    return success_response(session_obj)
+
+
+# 路由装饰器，定义 GET 方法获取单个会话详情的接口（带 session_id）
+@bp.route("/api/v1/sessions/<session_id>", methods=["GET"])
+@api_login_required
+@handle_api_error
+def api_get_session(session_id):
+    """获取会话详情和消息"""
+    current_user, err = get_current_user_or_error()
+    if err:
+        return err
+    # 根据 session_id 获取会话对象，校验所属当前用户
+    session_obj = session_service.get_session_by_id(session_id, current_user["id"])
+    # 如果没有找到会话，返回 404 错误
+    if not session_obj:
+        return error_response("Session not found", 404)
+
+    # 获取该会话下的所有消息
+    message = session_service.get_message(session_id, current_user["id"])
+    # 返回会话详情及消息列表
+    return success_response({"session": session_obj, "messages": message})
+
+
+# 路由装饰器，定义 DELETE 方法删除单个会话接口
+@bp.route("/api/v1/sessions/<session_id>", methods=["DELETE"])
+@api_login_required
+@handle_api_error
+def api_delete_session(session_id):
+    """删除会话"""
+    # 获取当前用户，如有错误直接返回
+    current_user, err = get_current_user_or_error()
+    if err:
+        return err
+    # 调用服务删除会话，校验归属当前会话
+    success = session_service.delete_session(session_id, current_user["id"])
+    # 若删除成功，返回成功响应，否则返回 404
+    if success:
+        return success_response(None, "Session deleted")
+    else:
+        return error_response("Session not found", 404)
+
+
+# 路由装饰器，定义 DELETE 方法清空所有会话的接口
+@bp.route("/api/v1/sessions", methods=["DELETE"])
+@api_login_required
+@handle_api_error
+def api_delete_all_sessions():
+    """清空所有会话"""
+    # 获取当前用户，如果有错误直接返回
+    current_user, err = get_current_user_or_error()
+    if err:
+        return err
+    # 调用服务删除所有属于当前用户的会话，返回删除数量
+    count = session_service.delete_all_sessions(current_user["id"])
+    # 返回成功响应及被删除会话数
+    return success_response({"deleted_count": count}, f"Deleted {count} sessions")
