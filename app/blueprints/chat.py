@@ -11,12 +11,14 @@ from app.blueprints.utils import (
     success_response,
     error_response,
     get_current_user_or_error,
+    get_pagination_params
 )
 
 # 导入知识库服务，用于后续业务逻辑
 from app.services.knowledgebase_service import kb_service
 
 from app.services.chat_service import chat_service
+from app.services.chat_session_service import session_service
 
 # 导入登录保护装饰器和获取当前用户辅助方法
 from app.utils.auth import login_required, get_current_user, api_login_required
@@ -62,10 +64,41 @@ def api_chat():
     # 如果问题内容为空，返回错误
     if not question:
         return error_response("question cannot be empty", 400)
+    # 会话ID可以为空表示普通聊天
+    session_id = data.get("session_id")
     # 获取 max_tokens 参数，默认 1000
     max_tokens = int(data.get("max_tokens", 1000))
     # 限制最大和最小值在 1~10000 之间
     max_tokens = max(1, min(max_tokens, 10000))
+
+    # 从请求数据中获取'stream'字段，默认为True，表示启用流式输出
+    stream = data.get("stream", True)
+    # 初始化历史消息为None
+    history = None
+    # 如果请求中带有session_id 说明有现有会话
+    if session_id:
+        # 根据session_id和当前用户ID获取历史消息列表
+        history_messages = session_service.get_message(session_id,current_user["id"])
+        # 将历史消息转换为对话格式，仅保留最近10条
+        history = [
+            {
+                "role": msg.get("role"),
+                "content": msg.get("content")
+            }
+            for msg in history_messages[-10:]
+        ]
+
+    # 如果请求中没有session_id，说明是新对话，需要新建会话
+    if not session_id:
+        # 创建新会话，kb_id 设为None表示普通聊天
+        chat_session = session_service.create_session(
+            user_id=current_user["id"]
+        )
+        # 使用新创建会话的ID作为本次会话
+        session_id = chat_session["id"]
+
+    # 将用户的问题消息保存到当前会话中
+    session_service.add_message(session_id,"user",question)
 
     # 声明用于流式输出的生成器
     @stream_with_context
